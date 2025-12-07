@@ -1,7 +1,7 @@
 # VetCan
-VetCan — A HIPAA-aware full-stack automation toolkit for medical cannabis clinics: telephony &amp; contact-center agents (inbound/outbound/email), appointment &amp; patient CRM, automated campaigns, and analytics. Optimized for veteran patient workflows and secure, auditable operations.
+VetCan — A HIPAA-aware full-stack automation toolkit for medical cannabis clinics: telephony &amp; contact-center agents (inbound/outbound/email), appointment &amp; patient CRM, automated campaigns, and analytics. Optimized for medical marijuana patient  workflows and secure, auditable operations.
 
-**VetCan** is a full-stack automation & CRM platform tailored to medical cannabis (medical marijuana) clinics, with a focus on veteran patient workflows. It provides modular telephony/contact-center components (Inbound Agents, Outbound Agents, Email Agents), appointment booking, secure patient data storage, analytics, and automation to dramatically reduce manual work and operating cost for small clinics.
+**VetCan** is a full-stack automation & CRM platform tailored to medical cannabis (medical marijuana) clinics, with a focus on medical marijuana patient workflows. It provides modular telephony/contact-center components (Inbound Agents, Outbound Agents, Email Agents), appointment booking, secure patient data storage, analytics, and automation to dramatically reduce manual work and operating cost for small clinics.
 
 > **Primary goals**
 > - Rapid appointment booking and call routing for inbound callers  

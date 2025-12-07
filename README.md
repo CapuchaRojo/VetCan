@@ -55,6 +55,9 @@ VetCan/
 └── seed_admin.sh
 
 
+Replace <<TEMPLATE>> values in .env.example before starting.
+
+
 ## Quick start (dev)
 1. Copy `.env.example` to `.env` and fill in values.
 2. `docker-compose up --build`

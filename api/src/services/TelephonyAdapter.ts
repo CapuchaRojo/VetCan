@@ -1,5 +1,5 @@
 export interface TelephonyAdapter {
-  dial(number: string, metadata?: any): Promise<any>;
-  hangup(callId: string): Promise<any>;
-  createInboundWebhook(req: any): Promise<any>;
+dial(phone: string, opts?: any): Promise<any>;
+hangup(callSid: string): Promise<any>;
+webhookHandler(req: any, res: any): Promise<any>;
 }

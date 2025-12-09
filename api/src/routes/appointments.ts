@@ -37,7 +37,8 @@ const appt = await prisma.appointment.create({ data: { patientId, providerId, da
 res.json(appt);
 } catch (err) { next(err); }
 });
-appointments.ts
+
+
 // Read
 router.get('/:id', requireAuth, async (req, res, next) => {
 try {

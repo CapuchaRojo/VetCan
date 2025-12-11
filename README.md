@@ -57,6 +57,32 @@ VetCan/
 
 Replace <<TEMPLATE>> values in .env.example before starting.
 
+name: CI
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: vetcan
+          POSTGRES_PASSWORD: vetcan
+          POSTGRES_DB: vetcan
+        ports: ['5432:5432']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install API deps
+        run: cd api && npm ci
+      - name: Run API tests
+        run: cd api && npm test
+      - name: Install Web deps
+        run: cd web && npm ci && npm test
+
+
 ## Quick start (dev)
 1. Copy `.env.example` to `.env` and fill in values.
 2. `docker-compose up --build`

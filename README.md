@@ -1,5 +1,6 @@
 # VetCan
 
+⚠️ VetCan is not a HIPAA Compliance guarantee — professional review required.
 
 VetCan is a full-stack automation & CRM platform for medical cannabis clinics, optimized for medical marijuana patient workflows. This repo scaffold covers Phase A-F (core CRM to analytics) and is intended as a robust starting point.
 

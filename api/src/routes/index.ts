@@ -1,12 +1,18 @@
 import { Router } from 'express';
-import patients from './patients';
-import appointments from './appointments';
-import calls from './calls';
-import auth from './auth';
 
+import { router as patientsRouter } from './patients';
+import { router as appointmentsRouter } from './appointments';
+
+// Optional routes — only mount if they exist
+// Commented out until implemented
+// import { router as callsRouter } from './calls';
+// import { router as authRouter } from './auth';
 
 export const router = Router();
-router.use('/auth', auth);
-router.use('/patients', patients);
-router.use('/appointments', appointments);
-router.use('/calls', calls);
+
+router.use('/patients', patientsRouter);
+router.use('/appointments', appointmentsRouter);
+
+// router.use('/calls', callsRouter);
+// router.use('/auth', authRouter);
+

@@ -3,7 +3,7 @@ import prisma from '../prisma';
 import { requireAuth } from '../middleware/auth';
 
 
-const router = Router();
+export const router = Router();
 
 
 // List / search

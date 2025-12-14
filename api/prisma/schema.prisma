@@ -28,10 +28,18 @@ model Appointment {
 id String @id @default(uuid())
 patient Patient @relation(fields: [patientId], references: [id])
 patientId String
-providerId String?
-datetime DateTime
-status String @default("scheduled")
+doctorId String // replaces providerId (clear semantics)
+startTime DateTime
+endTime DateTime
+status AppointmentStatus @default(SCHEDULED)
 createdAt DateTime @default(now())
+@@index([doctorId, startTime, endTime])
+}
+
+enum AppointmentStatus {
+SCHEDULED
+CANCELLED
+COMPLETED
 }
 
 

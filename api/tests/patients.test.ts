@@ -11,12 +11,14 @@ const auth = () => ({
 
 describe('Patients API – Full CRUD', () => {
   beforeEach(async () => {
+    // Delete children first
+    await prisma.appointment.deleteMany();
+    await prisma.call.deleteMany();
+
+    // Then delete parents
     await prisma.patient.deleteMany();
   });
 
-  afterAll(async () => {
-    await prisma.$disconnect();
-  });
 
   it('POST /api/patients → creates a patient', async () => {
     const res = await request(app)

@@ -1,12 +1,13 @@
 import express from 'express';
-import cors from 'cors';
-import { router } from '../../src/routes';
+import routes from '../../src/routes';
+import http from 'http';
 
-export function createTestApp() {
+export async function createTestApp() {
   const app = express();
-  app.use(cors());
   app.use(express.json());
-  app.use('/api', router);
-  return app;
-}
+  app.use('/api', routes);
 
+  const server = http.createServer(app);
+
+  return { app, server };
+}

@@ -3,23 +3,34 @@ import prisma from '../src/prisma';
 import { createTestApp } from './helpers/app';
 import { getTestToken } from './helpers/auth';
 
-const app = createTestApp();
+let app: any;
+let server: any;
+let token: string;
+
+beforeAll(async () => {
+  const setup = await createTestApp();
+  app = setup.app;
+  server = setup.server;
+  token = await getTestToken();
+});
+
+afterAll(async () => {
+  await prisma.$disconnect();
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+});
+
+beforeEach(async () => {
+  // Children → parents
+  await prisma.appointment.deleteMany();
+  await prisma.call.deleteMany();
+  await prisma.patient.deleteMany();
+});
 
 const auth = () => ({
-  Authorization: `Bearer ${getTestToken()}`
+  Authorization: `Bearer ${token}`,
 });
 
 describe('Patients API – Full CRUD', () => {
-  beforeEach(async () => {
-    // Delete children first
-    await prisma.appointment.deleteMany();
-    await prisma.call.deleteMany();
-
-    // Then delete parents
-    await prisma.patient.deleteMany();
-  });
-
-
   it('POST /api/patients → creates a patient', async () => {
     const res = await request(app)
       .post('/api/patients')
@@ -29,7 +40,7 @@ describe('Patients API – Full CRUD', () => {
         lastName: 'Doe',
         phone: '+15551234567',
         email: 'john@vetcan.test',
-        isVeteran: true
+        isVeteran: true,
       });
 
     expect(res.status).toBe(200);
@@ -37,7 +48,7 @@ describe('Patients API – Full CRUD', () => {
     expect(res.body.phone).toBe('+15551234567');
 
     const dbPatient = await prisma.patient.findUnique({
-      where: { phone: '+15551234567' }
+      where: { phone: '+15551234567' },
     });
 
     expect(dbPatient).not.toBeNull();
@@ -49,8 +60,8 @@ describe('Patients API – Full CRUD', () => {
       data: {
         firstName: 'Jane',
         lastName: 'Smith',
-        phone: '+15550000001'
-      }
+        phone: '+15550000001',
+      },
     });
 
     const res = await request(app)
@@ -67,8 +78,8 @@ describe('Patients API – Full CRUD', () => {
       data: {
         firstName: 'Mike',
         lastName: 'Ross',
-        phone: '+15550000002'
-      }
+        phone: '+15550000002',
+      },
     });
 
     const res = await request(app)
@@ -85,22 +96,20 @@ describe('Patients API – Full CRUD', () => {
       data: {
         firstName: 'Old',
         lastName: 'Name',
-        phone: '+15550000003'
-      }
+        phone: '+15550000003',
+      },
     });
 
     const res = await request(app)
       .put(`/api/patients/${patient.id}`)
       .set(auth())
-      .send({
-        firstName: 'Updated'
-      });
+      .send({ firstName: 'Updated' });
 
     expect(res.status).toBe(200);
     expect(res.body.firstName).toBe('Updated');
 
     const dbPatient = await prisma.patient.findUnique({
-      where: { id: patient.id }
+      where: { id: patient.id },
     });
 
     expect(dbPatient?.firstName).toBe('Updated');
@@ -111,8 +120,8 @@ describe('Patients API – Full CRUD', () => {
       data: {
         firstName: 'Temp',
         lastName: 'Delete',
-        phone: '+15550000004'
-      }
+        phone: '+15550000004',
+      },
     });
 
     const res = await request(app)
@@ -122,7 +131,7 @@ describe('Patients API – Full CRUD', () => {
     expect(res.status).toBe(200);
 
     const dbPatient = await prisma.patient.findUnique({
-      where: { id: patient.id }
+      where: { id: patient.id },
     });
 
     expect(dbPatient).toBeNull();
@@ -133,4 +142,3 @@ describe('Patients API – Full CRUD', () => {
     expect(res.status).toBe(401);
   });
 });
-

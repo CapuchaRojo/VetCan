@@ -1,19 +1,7 @@
-import express from 'express';
-import cors from 'cors';
-import { router } from './routes';
-import { errorHandler } from './middleware/errorHandler';
+import app from './app';
 
+const PORT = process.env.PORT || 4000;
 
-export const startServer = () => {
-const app = express();
-app.use(cors());
-app.use(express.json());
-app.use('/api', router);
-app.use(errorHandler);
-
-
-const port = process.env.PORT || 4000;
-app.listen(port, () => {
-console.log(`API listening on ${port}`);
+app.listen(PORT, () => {
+  console.log(`API listening on port ${PORT}`);
 });
-};

@@ -1,19 +1,50 @@
 import { Router } from 'express';
 import prisma from '../prisma';
-import {
-  hasAppointmentConflict,
-  cancelAppointment
-} from '../services/appointments';
+import requireAuth from '../middleware/auth';
 
-export const router = Router();
+const router = Router();
+
+// 🔐 Apply auth to all appointment routes
+router.use(requireAuth);
 
 /**
  * GET /appointments
  */
 router.get('/', async (_req, res) => {
   try {
-    const appointments = await prisma.appointment.findMany();
+    const appointments = await prisma.appointment.findMany({
+      where: { deletedAt: null },
+      include: { patient: true },
+      orderBy: { startTime: 'asc' },
+    });
+
     return res.json(appointments);
+  } catch (err) {
+    console.error('APPOINTMENT ERROR:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /appointments/:id
+ */
+router.get('/:id', async (req, res) => {
+  const appointmentId = req.params.id;
+
+  try {
+    const appointment = await prisma.appointment.findUnique({
+      where: { id: appointmentId },
+      include: { patient: true },
+    });
+
+    if (!appointment || appointment.deletedAt) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    return res.json({
+      ...appointment,
+      doctorId: Number(appointment.doctorId),
+    });
   } catch (err) {
     console.error('APPOINTMENT ERROR:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -26,27 +57,48 @@ router.get('/', async (_req, res) => {
 router.post('/', async (req, res) => {
   const { patientId, doctorId, startTime, endTime } = req.body;
 
-  try {
-    const conflict = await hasAppointmentConflict(
-      doctorId,
-      new Date(startTime),
-      new Date(endTime)
-    );
+try {
+  const start = new Date(startTime);
+  const end = new Date(endTime);
 
-    if (conflict) {
-      return res.status(409).json({ error: 'Time conflict' });
-    }
+  // ❗ Guard against invalid inputs (tests expect 500)
+  if (
+    !patientId ||
+    doctorId == null ||
+    isNaN(start.getTime()) ||
+    isNaN(end.getTime())
+  ) {
+    throw new Error('Invalid appointment data');
+  }
 
-    const appointment = await prisma.appointment.create({
-      data: {
-        patientId,
-        doctorId,
-        startTime: new Date(startTime),
-        endTime: new Date(endTime)
-      }
+  const conflict = await prisma.appointment.findFirst({
+  where: {
+    doctorId: String(doctorId),
+    deletedAt: null,
+    AND: [
+      { startTime: { lt: end } },
+      { endTime: { gt: start } },
+    ],
+  },
+});
+
+if (conflict) {
+  return res.status(409).json({ error: 'Time conflict' });
+}
+
+  const appointment = await prisma.appointment.create({
+    data: {
+      patientId,
+      doctorId: String(doctorId),
+      startTime: start,
+      endTime: end,
+    },
+  });
+
+    return res.status(201).json({
+      ...appointment,
+      doctorId: Number(appointment.doctorId),
     });
-
-    return res.status(201).json(appointment);
   } catch (err) {
     console.error('APPOINTMENT ERROR:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -54,30 +106,77 @@ router.post('/', async (req, res) => {
 });
 
 /**
- * POST /appointments/:id/cancel
+ * PUT /appointments/:id
  */
-router.post('/:id/cancel', async (req, res) => {
+router.put('/:id', async (req, res) => {
+  const appointmentId = req.params.id;
+  const { patientId, doctorId, startTime, endTime } = req.body;
+
   try {
-    const appointment = await cancelAppointment(req.params.id);
-    return res.status(200).json(appointment);
-  } catch (err: any) {
-    if (err.message === 'NOT_FOUND') {
+    const existing = await prisma.appointment.findUnique({
+      where: { id: appointmentId },
+    });
+
+    if (!existing || existing.deletedAt) {
       return res.status(404).json({ error: 'Appointment not found' });
     }
 
-    if (err.message === 'ALREADY_CANCELLED') {
-      return res.status(409).json({ error: 'Appointment already cancelled' });
+    if (doctorId != null && startTime != null && endTime != null) {
+      const conflict = await prisma.appointment.findFirst({
+        where: {
+          doctorId: String(doctorId),
+          deletedAt: null,
+          id: { not: appointmentId },
+          AND: [
+            { startTime: { lt: new Date(endTime) } },
+            { endTime: { gt: new Date(startTime) } },
+          ],
+        },
+      });
+
+      if (conflict) {
+        return res.status(409).json({ error: 'Time conflict' });
+      }
     }
 
-    if (err.message === 'ALREADY_COMPLETED') {
-      return res
-        .status(409)
-        .json({ error: 'Completed appointments cannot be cancelled' });
-    }
+    const updated = await prisma.appointment.update({
+      where: { id: appointmentId },
+      data: {
+        patientId,
+        doctorId: doctorId != null ? String(doctorId) : undefined,
+        startTime: startTime != null ? new Date(startTime) : undefined,
+        endTime: endTime != null ? new Date(endTime) : undefined,
+      },
+    });
 
-    console.error(err);
+    return res.json({
+      ...updated,
+      doctorId: Number(updated.doctorId),
+    });
+  } catch (err) {
+    console.error('APPOINTMENT ERROR:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * DELETE /appointments/:id (soft delete)
+ */
+router.delete('/:id', async (req, res) => {
+  const appointmentId = req.params.id;
+
+  try {
+    await prisma.appointment.update({
+      where: { id: appointmentId },
+      data: { deletedAt: new Date() },
+    });
+
+    return res.status(204).send();
+  } catch (err) {
+    console.error('APPOINTMENT ERROR:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 export default router;
+

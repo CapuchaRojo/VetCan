@@ -8,42 +8,58 @@ datasource db {
 }
 
 model Patient {
-  id           String        @id @default(uuid())
-  firstName    String
-  lastName     String
-  phone        String        @unique
-  email        String?
-  dob          DateTime?
-  isVeteran    Boolean       @default(false)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id          String   @id @default(uuid())
+  firstName   String
+  lastName    String
+  phone       String   @unique
+  email       String?
+  dob         DateTime?
+  isVeteran   Boolean  @default(false)
+
+  deletedAt  DateTime?   // 👈 soft delete
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
   appointments Appointment[]
   calls        Call[]
 }
 
 model Appointment {
-  id          String            @id @default(uuid())
-  patientId   String
-  createdAt   DateTime          @default(now())
-  doctorId    String
-  endTime     DateTime
-  startTime   DateTime
-  status      AppointmentStatus @default(SCHEDULED)
-  cancelledAt DateTime?
-  patient     Patient           @relation(fields: [patientId], references: [id])
+  id        String   @id @default(uuid())
+  patient   Patient @relation(fields: [patientId], references: [id])
+  patientId String
+  doctorId  String
+
+  startTime DateTime
+  endTime   DateTime
+  status    AppointmentStatus @default(SCHEDULED)
+
+  deletedAt DateTime?   // 👈 soft delete
+  createdAt DateTime @default(now())
 
   @@index([doctorId, startTime, endTime])
 }
 
 model Call {
-  id        String    @id @default(uuid())
-  patientId String?
-  callSid   String?   @unique
-  direction String
-  startedAt DateTime?
-  endedAt   DateTime?
-  recording String?
-  patient   Patient?  @relation(fields: [patientId], references: [id])
+  id         String   @id @default(uuid())
+
+  // Relations
+  patientId  String?
+  patient    Patient? @relation(fields: [patientId], references: [id])
+
+  // Telephony metadata
+  callSid    String?  @unique
+  direction  String   @default("inbound") // ✅ REQUIRED with safe default
+
+  // Timing
+  startedAt  DateTime?
+  endedAt    DateTime?
+
+  // Recording / media
+  recording  String?
+
+  // Auditing
+  createdAt  DateTime @default(now())
 }
 
 model Agent {

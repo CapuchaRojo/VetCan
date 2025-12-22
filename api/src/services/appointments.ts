@@ -13,6 +13,7 @@ export async function hasAppointmentConflict(
     where: {
       doctorId,
       status: 'SCHEDULED',
+      deletedAt: null,
       AND: [
         { startTime: { lt: endTime } },
         { endTime: { gt: startTime } }
@@ -24,11 +25,7 @@ export async function hasAppointmentConflict(
 }
 
 /**
- * Cancels an appointment if allowed.
- * Enforces business rules:
- * - must exist
- * - cannot cancel twice
- * - cannot cancel completed appointments
+ * Cancels an appointment using soft delete semantics.
  */
 export async function cancelAppointment(id: string) {
   const appointment = await prisma.appointment.findUnique({
@@ -51,7 +48,7 @@ export async function cancelAppointment(id: string) {
     where: { id },
     data: {
       status: 'CANCELLED',
-      cancelledAt: new Date()
+      deletedAt: new Date()
     }
   });
 }

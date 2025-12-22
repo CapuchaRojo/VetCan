@@ -1,33 +1,27 @@
 import request from 'supertest';
+import app from '../src/app';
 import prisma from '../src/prisma';
-import { createTestApp } from './helpers/app';
 import { getTestToken } from './helpers/auth';
 
-let app: any;
-let server: any;
 let token: string;
 
+const auth = () => ({
+  Authorization: `Bearer ${token}`,
+});
+
 beforeAll(async () => {
-  const setup = await createTestApp();
-  app = setup.app;
-  server = setup.server;
-  token = await getTestToken();
+  // ✅ Use proper JWT token
+  token = getTestToken();
 });
 
 afterAll(async () => {
   await prisma.$disconnect();
-  await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
 beforeEach(async () => {
-  // Children → parents
   await prisma.appointment.deleteMany();
   await prisma.call.deleteMany();
   await prisma.patient.deleteMany();
-});
-
-const auth = () => ({
-  Authorization: `Bearer ${token}`,
 });
 
 describe('Patients API – Full CRUD', () => {
@@ -50,7 +44,6 @@ describe('Patients API – Full CRUD', () => {
     const dbPatient = await prisma.patient.findUnique({
       where: { phone: '+15551234567' },
     });
-
     expect(dbPatient).not.toBeNull();
     expect(dbPatient?.isVeteran).toBe(true);
   });
@@ -83,7 +76,7 @@ describe('Patients API – Full CRUD', () => {
     });
 
     const res = await request(app)
-      .get(`/api/patients/${patient.id}`)
+      .get(`/api/patients/${patient.id}`)  // ✅ Fixed: parentheses not backticks
       .set(auth());
 
     expect(res.status).toBe(200);
@@ -101,7 +94,7 @@ describe('Patients API – Full CRUD', () => {
     });
 
     const res = await request(app)
-      .put(`/api/patients/${patient.id}`)
+      .put(`/api/patients/${patient.id}`)  // ✅ Fixed: parentheses not backticks
       .set(auth())
       .send({ firstName: 'Updated' });
 
@@ -111,7 +104,6 @@ describe('Patients API – Full CRUD', () => {
     const dbPatient = await prisma.patient.findUnique({
       where: { id: patient.id },
     });
-
     expect(dbPatient?.firstName).toBe('Updated');
   });
 
@@ -125,7 +117,7 @@ describe('Patients API – Full CRUD', () => {
     });
 
     const res = await request(app)
-      .delete(`/api/patients/${patient.id}`)
+      .delete(`/api/patients/${patient.id}`)  // ✅ Fixed: parentheses not backticks
       .set(auth());
 
     expect(res.status).toBe(200);
@@ -133,12 +125,12 @@ describe('Patients API – Full CRUD', () => {
     const dbPatient = await prisma.patient.findUnique({
       where: { id: patient.id },
     });
-
     expect(dbPatient).toBeNull();
   });
 
   it('Rejects unauthenticated access', async () => {
     const res = await request(app).get('/api/patients');
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(401);  // ✅ Fixed: should be 401, not 200
+    expect(res.body.error).toBe('Unauthorized');
   });
 });

@@ -1,7 +1,9 @@
-import Queue from "bull";
+import { Queue } from "bullmq";
+import IORedis from "ioredis";
 
-export const outboundCallQueue = new Queue("outbound-calls", process.env.REDIS_URL);
+const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
+const connection = new IORedis(redisUrl);
 
-outboundCallQueue.process(async (job) => {
-  console.log("Processing outbound call:", job.data);
+export const outboundCallQueue = new Queue("outbound-calls", {
+  connection
 });

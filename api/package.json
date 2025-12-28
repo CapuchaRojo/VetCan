@@ -4,7 +4,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.json",
     "start:prod": "node dist/index.js",
     "migrate": "prisma migrate deploy",
     "generate": "prisma generate",

@@ -1,4 +1,4 @@
-version: '3.9'
+version: "3.9"
 
 services:
   api:
@@ -8,22 +8,19 @@ services:
     env_file: .env
     ports:
       - "4000:4000"
-    volumes:
-      - ./api:/usr/src/app
     depends_on:
       - db
       - redis
 
   worker:
     build:
-      context: /home/station03/Documents/VetCan
+      context: .
       dockerfile: infra/Dockerfile.worker
     restart: unless-stopped
     environment:
       REDIS_URL: redis://redis:6379
     depends_on:
-      redis:
-        condition: service_started
+      - redis
 
   web:
     build:

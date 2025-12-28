@@ -1,8 +1,25 @@
-FROM node:20-alpine
+FROM node:20-bookworm
+
 WORKDIR /usr/src/app
+
+# Install dependencies first (better caching)
 COPY api/package*.json ./
 RUN npm ci
+
+# Copy source code ONLY (dist excluded by .dockerignore)
 COPY api .
-RUN npm run build
+
+# Ensure no stale build artifacts
+RUN rm -rf dist
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Build TypeScript cleanly
+RUN npx tsc --build --force
+
+ENV NODE_ENV=production
+
 EXPOSE 4000
-CMD ["npm","run","start:prod"]
+
+CMD ["node", "dist/index.js"]

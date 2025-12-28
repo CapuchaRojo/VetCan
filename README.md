@@ -1,103 +1,143 @@
 # VetCan
 
-⚠️ VetCan is not a HIPAA Compliance guarantee — professional review required.
+VetCan is a lightweight, clinic-style CRM + automation platform designed for **medical cannabis workflows** (and adjacent dispensary-style operations): appointments, callbacks, follow-ups, and operational visibility — with a clear path to SMS/voice automation (Twilio-ready).
 
-VetCan is a full-stack automation & CRM platform for medical cannabis clinics, optimized for medical marijuana patient workflows. This repo scaffold covers Phase A-F (core CRM to analytics) and is intended as a robust starting point.
-
-
-
-Replace <<TEMPLATE>> values in .env.example before starting.
-
-name: CI
-on: [push, pull_request]
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: vetcan
-          POSTGRES_PASSWORD: vetcan
-          POSTGRES_DB: vetcan
-        ports: ['5432:5432']
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Install API deps
-        run: cd api && npm ci
-      - name: Run API tests
-        run: cd api && npm test
-      - name: Install Web deps
-        run: cd web && npm ci && npm test
-
-
-## Quick start (dev)
-1. Copy `.env.example` to `.env` and fill in values.
-2. `docker-compose up --build`
-3. `docker exec -it vetcan_api npm run migrate && docker exec -it vetcan_api npm run seed`
-4. Visit http://localhost:5173 for the admin UI and http://localhost:4000/api for API.
-
-
-## Phases
-- Phase A: Core CRM & Appointments
-- Phase B: Inbound voice flows
-- Phase C: Outbound campaigns & dialer
-- Phase D: Email automation
-- Phase E: Security & compliance
-- Phase F: Analytics & reporting
-
-
-See the `docs/` folder (or this scaffold) for implementation details.
-
+> ⚠️ **Compliance disclaimer:** VetCan is *HIPAA-aware* but **not a HIPAA compliance guarantee**. Professional legal/security review is required for any production use involving patient/health data.
 
 ---
 
+## What you can demo in 60 seconds
 
-### `.gitignore`
+- API is online and responsive: `GET /health`
+- Core workflow endpoints for:
+  - patient records
+  - appointments
+  - calls/callback requests
+- Containerized deployment (repeatable, low-ops): API + DB + Redis + worker + web UI
 
-
-# VetCan
-.
-
-**VetCan** is a HIPAA-aware full-stack automation toolkit & CRM platform tailored to medical cannabis (medical marijuana) clinics, optimized with a focus on medical marijuana patient workflows. It provides modular telephony/contact-center components (Inbound Agents, Outbound Agents, Email Agents), appointment booking, secure patient data storage, analytics, and automated campaigns to dramatically reduce manual workflows and operating cost for small clinics.
-
-> **Primary goals**
-> - Rapid appointment booking and call routing for inbound callers  
-> - Scalable outbound appointment/renewal campaigns and promos  
-> - Email follow-up and lead nurturing automation  
-> - Secure, auditable patient data store and role-based access control  
-> - Low ops overhead; integrate with RingCentral / Twilio / CRM as needed
+This is built to answer one business question:
+> “How do we reduce missed callbacks, missed renewals, and manual follow-ups — without adding staff?”
 
 ---
 
-## Table of contents
-- [Project scope & disclaimers](#project-scope--disclaimers)  
-- [Architecture overview](#architecture-overview)  
-- [Core components](#core-components)  
-- [Getting started (dev)](#getting-started-dev)  
-- [Database schema (proposed)](#database-schema-proposed)  
-- [APIs (example endpoints)](#apis-example-endpoints)  
-- [Telephony & third-party integrations](#telephony--third-party-integrations)  
-- [Security & compliance notes](#security--compliance-notes)  
-- [Operational runbook highlights](#operational-runbook-highlights)  
-- [Monitoring, logging & backups](#monitoring-logging--backups)  
-- [License recommendation](#license-recommendation)  
-- [Project management & rollout plan (phased)](#project-management--rollout-plan-phased)  
-- [KPIs & success metrics](#kpis--success-metrics)  
-- [Contributing](#contributing)  
-- [Contact / Owner info](#contact--owner-info)
+## Architecture (MVP)
+
+- **api/** — Express + TypeScript API (Prisma + Postgres)
+- **web/** — Admin UI
+- **worker/** — background jobs / automation runner
+- **infra/** — Dockerfiles (api/web/worker)
+- **db** — Postgres 15
+- **redis** — Redis 7 (queues + lightweight caching)
 
 ---
 
-## Project scope & disclaimers
-VetCan will handle medical patient contact workflows and may process sensitive health information. This repo provides code and deployment patterns, but **you must** consult legal/compliance counsel for Florida medical cannabis & veteran data requirements and for whether HIPAA, state rules, or other statutes apply to your workflows. Treat all patient data as sensitive until counsel states otherwise.
+## Quick start (local)
 
----
+### 1) Configure env
+Copy `.env.example` → `.env` and fill in values (DB creds, keys, etc).
 
-## Architecture overview
+### 2) Build + run
+```bash
+docker compose up --build -d
+3) Verify API health
+bash
+Copy code
+curl http://localhost:4000/health
+Expected:
 
-High-level architecture (modular microservice-ish layout, can be deployed in a single VM for MVP):
+json
+Copy code
+{"status":"ok","service":"vetcan-api","uptime":12.34,"timestamp":"..."}
+4) (Optional) Migrate & seed
+If your project uses migrations/seeds:
 
+bash
+Copy code
+docker exec -it vetcan-api-1 npm run migrate
+docker exec -it vetcan-api-1 npm run seed
+Web UI (if enabled):
+
+http://localhost:5173
+
+API:
+
+http://localhost:4000
+
+Key endpoints
+GET /health — service health + uptime
+
+GET /api/patients — patients
+
+GET /api/appointments — appointments
+
+GET /api/calls — calls / callback records
+
+(Exact route sets may evolve as milestones progress.)
+
+Milestones (presentation-driven)
+Milestone v0.1 — Stable baseline (✅)
+Docker compose runs reliably
+
+API health endpoint
+
+DB + Redis + worker + web containers start cleanly
+
+Milestone v0.2 — “Golden flow” demo (next)
+One simple, sellable loop:
+
+customer requests callback
+
+staff sees it in UI
+
+customer receives a notification (initially console provider; Twilio later)
+
+Milestone v0.3 — SMS/Voice integration (Twilio-ready)
+SMS notifications
+
+optional inbound/outbound call hooks
+
+templates + message logging
+
+Twilio & integrations
+Twilio integration is planned behind a provider interface so the system can support:
+
+Twilio (SMS/voice)
+
+RingCentral (later)
+
+email providers
+
+We will ship with a “console provider” first to keep MVP stable and demo-ready, then switch to Twilio in a single focused PR.
+
+Testing & CI
+API tests:
+
+bash
+Copy code
+cd api && npm test
+If CI is enabled, it should:
+
+install API deps
+
+run API tests
+
+install web deps
+
+run web tests (if present)
+
+Notes for production hardening (later)
+authentication + RBAC
+
+audit trails for patient/call actions
+
+encrypted secrets management
+
+data retention rules
+
+logging + monitoring
+
+License
+See LICENSE.
+
+Contact / Owner
+VetCan is being built as a milestone-driven MVP for real-world operators. If you’re evaluating it for a clinic/dispensary workflow, the best next step is a live demo of the callback + follow-up loop.

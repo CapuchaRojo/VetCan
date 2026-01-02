@@ -7,6 +7,7 @@ import callbacksRouter from './routes/callbacks';
 
 const app = express();
 
+app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
 // ✅ HEALTH CHECK — THIS MUST BE HERE

@@ -1,16 +1,13 @@
 // api/src/app.ts
 import express from 'express';
-import patientsRouter from './routes/patients';
-import appointmentsRouter from './routes/appointments';
-import callsRouter from './routes/calls';
-import callbacksRouter from './routes/callbacks';
+import routes from './routes';
 
 const app = express();
 
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
-// ✅ HEALTH CHECK — THIS MUST BE HERE
+// ✅ Single authoritative health check
 app.get('/health', (_req, res) => {
   res.status(200).json({
     status: 'ok',
@@ -20,9 +17,20 @@ app.get('/health', (_req, res) => {
   });
 });
 
-app.use('/api/patients', patientsRouter);
-app.use('/api/appointments', appointmentsRouter);
-app.use('/api/calls', callsRouter);
-app.use('/api/callbacks', callbacksRouter);
+// ✅ Mount ALL routes through the barrel
+app.use('/api', routes);
+
+// 🔎 DEBUG: list registered routes
+app.get('/__debug/routes', (_req, res) => {
+  // @ts-ignore
+  const stack = app._router.stack
+    .filter((r: any) => r.route)
+    .map((r: any) => ({
+      path: r.route.path,
+      methods: r.route.methods,
+    }));
+
+  res.json(stack);
+});
 
 export default app;

@@ -1,11 +1,13 @@
 // api/src/app.ts
 import express from 'express';
 import routes from './routes';
+import { apiLimiter } from "./middleware/rateLimit";
 
 const app = express();
 
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
+app.use("/api", apiLimiter);
 
 // ✅ Single authoritative health check
 app.get('/health', (_req, res) => {

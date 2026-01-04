@@ -8,6 +8,8 @@ import patientsRouter from './patients';
 import callsRouter from './calls';
 import callbacksRouter from './callbacks';
 import smsRouter from './sms';
+import stats from './stats';
+
 
 const router = Router();
 const VoiceResponse = twilio.twiml.VoiceResponse;
@@ -21,6 +23,8 @@ router.use('/patients', patientsRouter);
 router.use('/calls', callsRouter);
 router.use('/callbacks', callbacksRouter);
 router.use('/webhooks/twilio', smsRouter);
+router.use('/stats', stats);
+
 
 /* -------------------------------------------------
    VOICE – INBOUND CALLBACK FLOW (NON-PHI)

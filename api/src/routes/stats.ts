@@ -7,39 +7,74 @@ router.get("/", async (_req, res) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [
-    callbacksToday,
-    callbacksTotal,
-    completedToday,
-    pending,
-    lastCallback,
-  ] = await Promise.all([
-    prisma.callbackRequest.count({
-      where: { createdAt: { gte: today } },
-    }),
-    prisma.callbackRequest.count(),
-    prisma.callbackRequest.count({
-      where: {
-        status: "completed",
-        createdAt: { gte: today },
-      },
-    }),
-    prisma.callbackRequest.count({
-      where: { status: "pending" },
-    }),
-    prisma.callbackRequest.findFirst({
-      orderBy: { createdAt: "desc" },
-      select: { createdAt: true },
-    }),
-  ]);
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  res.json({
-    callbacksToday,
-    callbacksTotal,
-    completedToday,
-    pending,
-    lastCallbackAt: lastCallback?.createdAt ?? null,
-  });
+  try {
+    const [
+      callbacksToday,
+      callbacksTotal,
+      completedToday,
+      completedTotal,
+      pending,
+      lastCallback,
+      bySource,
+    ] = await Promise.all([
+      prisma.callbackRequest.count({
+        where: { createdAt: { gte: today } },
+      }),
+      prisma.callbackRequest.count(),
+      prisma.callbackRequest.count({
+        where: {
+          status: "completed",
+          createdAt: { gte: today },
+        },
+      }),
+      prisma.callbackRequest.count({
+        where: { status: "completed" },
+      }),
+      prisma.callbackRequest.count({
+        where: { status: "pending" },
+      }),
+      prisma.callbackRequest.findFirst({
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      }),
+      prisma.callbackRequest.groupBy({
+        by: ["source"],
+        _count: {
+          _all: true,
+        },
+      }),
+    ]);
+
+    const sourceBreakdown = bySource.reduce(
+  (acc: Record<string, number>, row) => {
+    acc[row.source ?? "unknown"] = row._count._all;
+    return acc;
+  },
+  {}
+);
+
+res.json({
+  callbacksToday,
+  callbacksTotal,
+  completedToday,
+  completedTotal,
+  pending,
+  completionRate:
+    callbacksTotal === 0
+      ? 0
+      : Math.round((completedTotal / callbacksTotal) * 100),
+  aiHandled: callbacksTotal,
+  sourceBreakdown,
+  lastCallbackAt: lastCallback?.createdAt ?? null,
+  updatedAt: new Date().toISOString(),
+});
+  } catch (err) {
+    console.error("[stats error]", err);
+    res.status(500).json({ error: "Failed to load stats" });
+  }
 });
 
 export default router;

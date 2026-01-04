@@ -95,26 +95,43 @@ router.get('/', async (_req, res) => {
 
 /**
  * POST /api/callbacks/:id/complete
- * Mark callback as completed
+ * Mark callback as completed (idempotent + guarded)
  */
 router.post('/:id/complete', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const callback = await prisma.callbackRequest.update({
+    // 🔒 GUARD 1: must exist
+    const callback = await prisma.callbackRequest.findUnique({
       where: { id },
-      data: { status: 'completed' }
+    });
+
+    if (!callback) {
+      return res.status(404).json({ error: 'Callback not found' });
+    }
+
+    // 🔒 GUARD 2: must not already be completed
+    if (callback.status === 'completed') {
+      return res.status(409).json({
+        error: 'Callback already completed',
+      });
+    }
+
+    // ✅ SAFE UPDATE
+    const updated = await prisma.callbackRequest.update({
+      where: { id },
+      data: { status: 'completed' },
     });
 
     await notificationProvider.send(
-      callback.phone,
+      updated.phone,
       'Thanks for speaking with us! If you need anything else, feel free to reach out.'
     );
 
     res.json({
-      id: callback.id,
-      status: callback.status,
-      message: 'Callback marked as completed'
+      id: updated.id,
+      status: updated.status,
+      message: 'Callback marked as completed',
     });
   } catch (err) {
     console.error('[callbacks COMPLETE] error:', err);

@@ -150,5 +150,36 @@ router.post("/voice/time", async (req, res) => {
 
   res.type("text/xml").send(twiml.toString());
 });
+/**
+ * POST /api/voice/outbound
+ * Used by Twilio when we place an outbound call
+ */
+router.post("/voice/outbound", (req, res) => {
+  const twiml = new VoiceResponse();
+
+  twiml.say(
+    "Hello. This is VetCan returning your call. Please stay on the line."
+  );
+
+  twiml.pause({ length: 1 });
+
+  twiml.say(
+    "A representative will be with you shortly."
+  );
+
+  twiml.hangup();
+
+  res.type("text/xml").send(twiml.toString());
+});
+
+router.post("/voice/outbound", (_req, res) => {
+  const twiml = new VoiceResponse();
+
+  twiml.say(
+    "Hello, this is VetCan returning your call. Please stay on the line while we connect you."
+  );
+
+  res.type("text/xml").send(twiml.toString());
+});
 
 export default router;

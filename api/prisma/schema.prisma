@@ -1,11 +1,11 @@
 generator client {
-  provider      = "prisma-client-js"
+  provider = "prisma-client-js"
   binaryTargets = ["native", "linux-musl"]
 }
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
+  url      = "file:./prisma/dev.db"
 }
 
 model Patient {
@@ -27,14 +27,13 @@ model Patient {
 
 model Appointment {
   id        String   @id @default(uuid())
-  patient   Patient @relation(fields: [patientId], references: [id])
   patientId String
   doctorId  String
 
+  patient   Patient @relation(fields: [patientId], references: [id])
+
   startTime DateTime
   endTime   DateTime
-
-  // String instead of enum (SQLite-compatible)
   status    String   @default("SCHEDULED")
 
   deletedAt DateTime?
@@ -44,41 +43,34 @@ model Appointment {
 }
 
 model Call {
-  id String @id @default(uuid())
+  id        String   @id @default(uuid())
 
-  // Relations
   patientId String?
   patient   Patient? @relation(fields: [patientId], references: [id])
 
-  // Telephony metadata
-  callSid   String? @unique
-  direction String  @default("inbound") // inbound | outbound
+  callSid   String?  @unique
+  direction String   @default("inbound")
 
-  // Timing
   startedAt DateTime?
   endedAt   DateTime?
-
-  // Media
   recording String?
 
   createdAt DateTime @default(now())
 }
 
 model CallbackRequest {
-  id    String @id @default(cuid())
-  name  String
-  phone String
+  id            String   @id @default(cuid())
+  name          String
+  phone         String
 
-  // Non-PHI only
   requestType   String?
   preferredTime String?
 
-  // pending | completed | needs_staff | failed
-  status String
+  status        String
+  source        String   @default("sms")
 
-  source    String   @default("sms")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model Agent {

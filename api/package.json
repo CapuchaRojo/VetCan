@@ -9,7 +9,7 @@
     "migrate": "prisma migrate deploy",
     "generate": "prisma generate",
     "seed": "ts-node src/prisma/seed.ts",
-    "test": "NODE_ENV=test dotenv -e .env.test -- prisma generate --schema=prisma/schema.test.prisma && dotenv -e .env.test -- jest --runInBand"
+    "test": "dotenv -e .env.test -- prisma generate && dotenv -e .env.test -- jest --runInBand"
   },
   "dependencies": {
     "@prisma/client": "^5.0.0",

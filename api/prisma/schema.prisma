@@ -1,25 +1,25 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "linux-musl"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 model Patient {
-  id          String   @id @default(uuid())
-  firstName   String
-  lastName    String
-  phone       String   @unique
-  email       String?
-  dob         DateTime?
-  isVeteran   Boolean  @default(false)
+  id        String   @id @default(uuid())
+  firstName String
+  lastName  String
+  phone     String   @unique
+  email     String?
+  dob       DateTime?
+  isVeteran Boolean  @default(false)
 
-  deletedAt  DateTime?   // 👈 soft delete
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   appointments Appointment[]
   calls        Call[]
@@ -33,49 +33,52 @@ model Appointment {
 
   startTime DateTime
   endTime   DateTime
-  status    AppointmentStatus @default(SCHEDULED)
 
-  deletedAt DateTime?   // 👈 soft delete
+  // String instead of enum (SQLite-compatible)
+  status    String   @default("SCHEDULED")
+
+  deletedAt DateTime?
   createdAt DateTime @default(now())
 
   @@index([doctorId, startTime, endTime])
 }
 
 model Call {
-  id         String   @id @default(uuid())
+  id String @id @default(uuid())
 
   // Relations
-  patientId  String?
-  patient    Patient? @relation(fields: [patientId], references: [id])
+  patientId String?
+  patient   Patient? @relation(fields: [patientId], references: [id])
 
   // Telephony metadata
-  callSid    String?  @unique
-  direction  String   @default("inbound") // ✅ REQUIRED with safe default
+  callSid   String? @unique
+  direction String  @default("inbound") // inbound | outbound
 
   // Timing
-  startedAt  DateTime?
-  endedAt    DateTime?
+  startedAt DateTime?
+  endedAt   DateTime?
 
-  // Recording / media
-  recording  String?
+  // Media
+  recording String?
 
-  // Auditing
-  createdAt  DateTime @default(now())
+  createdAt DateTime @default(now())
 }
 
 model CallbackRequest {
-  id            String   @id @default(cuid())
-  name          String
-  phone         String
+  id    String @id @default(cuid())
+  name  String
+  phone String
 
-  // Phase 1: Non-PHI only
-  requestType   String?  // 'new_patient' | 'renewal' | 'general_question' | 'scheduling'
+  // Non-PHI only
+  requestType   String?
   preferredTime String?
 
-  status        String   // 'pending' | 'completed'
-  source        String   @default("sms")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  // pending | completed | needs_staff | failed
+  status String
+
+  source    String   @default("sms")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Agent {
@@ -84,10 +87,4 @@ model Agent {
   email     String   @unique
   role      String
   createdAt DateTime @default(now())
-}
-
-enum AppointmentStatus {
-  SCHEDULED
-  CANCELLED
-  COMPLETED
 }

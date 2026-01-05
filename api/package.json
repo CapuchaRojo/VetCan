@@ -10,10 +10,14 @@
 
     "prisma:generate": "npx prisma@5.22.0 generate",
     "prisma:migrate": "npx prisma@5.22.0 migrate deploy",
+    "prisma:validate": "npx prisma@5.22.0 validate",
+
     "postinstall": "npx prisma@5.22.0 generate",
 
     "seed": "ts-node src/prisma/seed.ts",
+
     "test": "dotenv -e .env.test -- npx prisma@5.22.0 generate && dotenv -e .env.test -- jest --runInBand"
+}
   },
   "dependencies": {
     "@prisma/client": "5.22.0",

@@ -25,7 +25,7 @@
     "prisma:migrate": "npx prisma@5.22.0 migrate deploy",
     "prisma:validate": "npx prisma@5.22.0 validate",
 
-    "postinstall": "npx prisma@5.22.0 generate",
+    "postinstall": "DATABASE_URL=file:./prisma/dev.db npx prisma@5.22.0 generate"
 
     "seed": "ts-node src/prisma/seed.ts",
 

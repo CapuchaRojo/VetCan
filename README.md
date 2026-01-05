@@ -136,8 +136,15 @@ data retention rules
 
 logging + monitoring
 
+## Development Guardrails
+
+- Pre-commit: runs `npm test`
+- CI: runs full test suite on PRs
+- Commits with failing tests are blocked locally
+
 License
 See LICENSE.
 
 Contact / Owner
 VetCan is being built as a milestone-driven MVP for real-world operators. If you’re evaluating it for a clinic/dispensary workflow, the best next step is a live demo of the callback + follow-up loop.
+

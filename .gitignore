@@ -8,7 +8,11 @@ coverage/
 # Environment files (DO NOT COMMIT)
 .env
 .env.*
+!.env.example
 NODE_ENV
+api/.env
+api/.env.*
+!api/.env.example
 
 # Logs
 *.log

@@ -2,6 +2,8 @@
 // This project is pinned to Prisma v5.x
 // Prisma v7+ removes datasource.url and will BREAK this schema
 // Codex: use prisma@5.22.0 ONLY
+// CI uses SQLite at file:./prisma/ci.db
+// DATABASE_URL is injected by GitHub Actions
 
 generator client {
   provider = "prisma-client-js"

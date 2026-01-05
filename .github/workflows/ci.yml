@@ -1,3 +1,7 @@
+# NOTE:
+# Prisma is pinned to v5.22.0
+# SQLite is used in CI to avoid external services
+
 name: VetCan API CI
 
 on:

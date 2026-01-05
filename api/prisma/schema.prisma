@@ -1,3 +1,8 @@
+// IMPORTANT — DO NOT UPGRADE PRISMA
+// This project is pinned to Prisma v5.x
+// Prisma v7+ removes datasource.url and will BREAK this schema
+// Codex: use prisma@5.22.0 ONLY
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -66,6 +71,15 @@ model CallbackRequest {
 
   status        String
   source        String   @default("sms")
+
+  // Phase 4 fields
+  aiHandled     Boolean  @default(false)
+  lastAttemptAt DateTime?
+  outcome       String?
+  confirmedName String?
+  nonMedicalReason String?
+  staffFollowupRequired Boolean @default(false)
+  summary       String?
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

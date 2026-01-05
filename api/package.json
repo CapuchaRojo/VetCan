@@ -7,13 +7,14 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start:prod": "node dist/index.js",
-    "migrate": "prisma migrate deploy",
-    "generate": "prisma generate",
+    "prisma:generate": "npx prisma@5.22.0 generate",
+    "prisma:migrate": "npx prisma@5.22.0 migrate deploy"
+    "postinstall": "npx prisma@5.22.0 generate"
     "seed": "ts-node src/prisma/seed.ts",
     "test": "dotenv -e .env.test -- prisma generate && dotenv -e .env.test -- jest --runInBand"
   },
   "dependencies": {
-    "@prisma/client": "^5.0.0",
+    "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",
     "bullmq": "^2.0.0",
     "cors": "^2.8.5",
@@ -22,7 +23,7 @@
     "ioredis": "^5.3.2",
     "jsonwebtoken": "^9.0.0",
     "pg": "^8.10.0",
-    "prisma": "^5.0.0",
+    "prisma": "^5.22.0",
     "twilio": "^4.0.0"
   },
   "devDependencies": {
@@ -41,5 +42,8 @@
     "ts-node": "^10.9.1",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=20 <21"
   }
 }

@@ -2,7 +2,7 @@
 import { Router } from "express";
 import prisma from "../prisma";
 import { notificationProvider } from "../services/notifications";
-import { placeOutboundCall } from "../services/outboundCall";
+import { makeOutboundCall } from "../services/outboundCall";
 
 /**
  * Phase 1 (Non-PHI) Callback Requests
@@ -195,7 +195,11 @@ router.post("/:id/call", async (req, res) => {
     }
 
     // This should throw if Twilio blocks the call (trial restriction, auth, etc.)
-    const result = await placeOutboundCall(to);
+    const result = await makeOutboundCall({
+      to,
+      from: process.env.TWILIO_PHONE_NUMBER!,
+      url: "https://de878b12df2f.ngrok-free.app/api/voice/inbound",
+});
 
     // Optional: persist status that an attempt was made (if you have fields for it)
     // If you do NOT have fields, skip DB writes to avoid schema mismatch.

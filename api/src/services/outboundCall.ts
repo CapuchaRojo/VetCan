@@ -1,20 +1,43 @@
-import twilio from "twilio";
+// api/src/services/outboundCall.ts
+import twilio, { Twilio } from "twilio";
 
-const client = twilio(
-  process.env.TWILIO_ACCOUNT_SID!,
-  process.env.TWILIO_AUTH_TOKEN!
-);
+let client: Twilio | null = null;
 
-export async function placeOutboundCall(to: string) {
-  const from = process.env.TWILIO_FROM_NUMBER;
+function getTwilioClient(): Twilio {
+  if (!client) {
+    const sid = process.env.TWILIO_ACCOUNT_SID;
+    const token = process.env.TWILIO_AUTH_TOKEN;
 
-  if (!from) {
-    throw new Error("TWILIO_FROM_NUMBER is not defined");
+    if (!sid || !token) {
+      throw new Error("Twilio credentials not configured");
+    }
+
+    client = twilio(sid, token);
   }
 
-  return client.calls.create({
-    to,
-    from,
-    url: `${process.env.PUBLIC_BASE_URL}/api/voice/outbound`,
+  return client;
+}
+
+export interface OutboundCallParams {
+  to: string;
+  from: string;
+  twiml?: string;
+  url?: string;
+}
+
+/**
+ * Places an outbound call via Twilio.
+ * This function is safe to import in tests (lazy Twilio init).
+ */
+export async function makeOutboundCall(
+  params: OutboundCallParams
+) {
+  const twilioClient = getTwilioClient();
+
+  return twilioClient.calls.create({
+    to: params.to,
+    from: params.from,
+    twiml: params.twiml,
+    url: params.url,
   });
 }

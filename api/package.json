@@ -9,7 +9,7 @@
     "migrate": "prisma migrate deploy",
     "generate": "prisma generate",
     "seed": "ts-node src/prisma/seed.ts",
-    "test": "NODE_ENV=test jest --runInBand"
+    "test": "NODE_ENV=test prisma generate --schema=prisma/schema.test.prisma && jest --runInBand"
   },
   "dependencies": {
     "@prisma/client": "^5.0.0",

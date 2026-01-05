@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Patient {
+  id          String   @id @default(uuid())
+  firstName   String
+  lastName    String
+  phone       String   @unique
+  email       String?
+  dob         DateTime?
+  isVeteran   Boolean  @default(false)
+
+  deletedAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  appointments Appointment[]
+  calls        Call[]
+}
+
+model Appointment {
+  id        String   @id @default(uuid())
+  patient   Patient @relation(fields: [patientId], references: [id])
+  patientId String
+  doctorId  String
+
+  startTime DateTime
+  endTime   DateTime
+  status    String @default("SCHEDULED")
+
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([doctorId, startTime, endTime])
+}
+
+model Call {
+  id         String   @id @default(uuid())
+
+  patientId  String?
+  patient    Patient? @relation(fields: [patientId], references: [id])
+
+  callSid    String?  @unique
+  direction  String   @default("inbound")
+
+  startedAt  DateTime?
+  endedAt    DateTime?
+  recording  String?
+
+  createdAt  DateTime @default(now())
+}
+
+model CallbackRequest {
+  id            String   @id @default(cuid())
+  name          String
+  phone         String
+  requestType   String?
+  preferredTime String?
+  status        String
+  source        String   @default("sms")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Agent {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  role      String
+  createdAt DateTime @default(now())
+}

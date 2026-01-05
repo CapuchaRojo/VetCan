@@ -10,24 +10,10 @@ jobs:
   api-tests:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: vetcan
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vetcan
+      DATABASE_URL: file:./prisma/ci.db
       JWT_SECRET: ci-secret
+      NODE_ENV: test
 
     steps:
       - name: Checkout repo
@@ -36,22 +22,30 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
+          cache: npm
+          cache-dependency-path: api/package-lock.json
 
       - name: Install dependencies
         run: |
           cd api
           npm ci
 
+      - name: Prepare SQLite database
+        run: |
+          cd api
+          mkdir -p prisma
+          rm -f prisma/ci.db
+
       - name: Generate Prisma client
         run: |
           cd api
-          npx prisma generate
+          npx prisma@5.22.0 generate
 
-      - name: Run migrations
+      - name: Push schema to SQLite
         run: |
           cd api
-          npx prisma migrate deploy
+          npx prisma@5.22.0 db push
 
       - name: Run tests
         run: |

@@ -10,7 +10,6 @@ type Callback = {
   source?: string;
   createdAt: string;
 
-  // Phase 4 fields
   aiHandled?: boolean;
   aiOutcome?: string | null;
   staffFollowupRequired?: boolean;
@@ -24,13 +23,22 @@ export default function Dashboard() {
   const [query, setQuery] = useState("");
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
+  const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCallbacks = async () => {
       try {
         const res = await fetch("/api/callbacks");
-        const data = await res.json();
+        const data: Callback[] = await res.json();
+
         setCallbacks(data);
+
+        if (data.length > 0) {
+          setRecentlyUpdatedId(data[0].id);
+          setTimeout(() => setRecentlyUpdatedId(null), 2000);
+        }
+
         setLastUpdated(new Date());
         setLoading(false);
       } catch (err) {
@@ -39,15 +47,11 @@ export default function Dashboard() {
       }
     };
 
-  // initial load
-  fetchCallbacks();
+    fetchCallbacks();
+    const interval = setInterval(fetchCallbacks, 15000);
 
-  // auto-refresh every 15s
-  const interval = setInterval(fetchCallbacks, 15000);
-
-  // cleanup
-  return () => clearInterval(interval);
-}, []);
+    return () => clearInterval(interval);
+  }, []);
 
   const todayCount = callbacks.filter(cb => {
     const created = new Date(cb.createdAt);
@@ -90,6 +94,9 @@ export default function Dashboard() {
 
       const updated = await fetch("/api/callbacks").then(r => r.json());
       setCallbacks(updated);
+
+      setToast("AI callback processed successfully");
+      setTimeout(() => setToast(null), 3000);
     } catch (err) {
       console.error("AI callback error", err);
       alert("AI callback attempt failed");
@@ -101,6 +108,12 @@ export default function Dashboard() {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <h1 className="text-2xl font-semibold mb-1">VetCan Admin Dashboard</h1>
+
+      {toast && (
+        <div className="fixed top-4 right-4 bg-indigo-600 text-white px-4 py-2 rounded shadow-lg text-sm">
+          {toast}
+        </div>
+      )}
 
       {lastUpdated && (
         <small className="block text-gray-400 mb-2">
@@ -116,6 +129,7 @@ export default function Dashboard() {
           <div className="text-sm text-gray-500">Callbacks Today</div>
           <div className="text-3xl font-bold">{todayCount}</div>
         </div>
+
         <div className="p-4 border rounded bg-white">
           <div className="text-sm text-gray-500">Completion Rate</div>
           <div className="text-3xl font-bold">
@@ -125,6 +139,7 @@ export default function Dashboard() {
             )}%
           </div>
         </div>
+
         <div className="p-4 border rounded bg-white">
           <div className="text-sm text-gray-500">Pending</div>
           <div className="text-3xl font-bold">
@@ -133,7 +148,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Filter Tabs */}
+      {/* Filters */}
       <div className="flex gap-2 mb-4">
         {[
           { key: "all", label: "All" },
@@ -155,7 +170,6 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Search */}
       <input
         type="text"
         placeholder="Search by name or phone"
@@ -164,7 +178,6 @@ export default function Dashboard() {
         className="mb-4 w-full max-w-sm rounded border px-3 py-2"
       />
 
-      {/* Table */}
       {loading ? (
         <p className="text-gray-500">Loading callbacks…</p>
       ) : filtered.length === 0 ? (
@@ -185,15 +198,26 @@ export default function Dashboard() {
           </thead>
           <tbody>
             {filtered.map(cb => (
-              <tr key={cb.id} className="border-t">
+              <tr
+                key={cb.id}
+                className={`border-t transition-colors ${
+                  cb.id === recentlyUpdatedId ? "bg-yellow-50" : ""
+                }`}
+              >
                 <td>{cb.name}</td>
                 <td>{cb.phone}</td>
                 <td>{cb.status}</td>
-                <td>{cb.aiHandled ? "🤖" : "—"}</td>
-                <td>{cb.staffFollowupRequired ? "⚠️" : "—"}</td>
-                <td title={cb.summary ?? ""}>
-                  {cb.summary ?? "—"}
+                <td>
+                  {cb.aiHandled ? (
+                    <span className="inline-flex items-center gap-1 animate-pulse">
+                      🤖 <span className="text-xs text-gray-400">AI</span>
+                    </span>
+                  ) : (
+                    "—"
+                  )}
                 </td>
+                <td>{cb.staffFollowupRequired ? "⚠️" : "—"}</td>
+                <td>{cb.summary ?? "—"}</td>
                 <td>{new Date(cb.createdAt).toLocaleString()}</td>
                 <td>
                   {cb.status === "pending" ? (

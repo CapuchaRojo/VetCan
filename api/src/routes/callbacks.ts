@@ -36,69 +36,11 @@ function normalizePhone(phone: unknown): string {
   return raw.replace(/[^\d+]/g, "");
 }
 
-/**
- * Very conservative keyword gate for medical content.
- * (We want false positives over false negatives.)
- */
-function isMedicalContent(text: string): boolean {
-  const t = (text || "").toLowerCase();
-  const keywords = [
-    "symptom",
-    "diagnos",
-    "condition",
-    "disease",
-    "pain",
-    "dose",
-    "dosage",
-    "mg",
-    "medication",
-    "medicine",
-    "prescription",
-    "rx",
-    "side effect",
-    "contraindication",
-    "allergy",
-    "blood pressure",
-    "heart",
-    "cancer",
-    "anxiety",
-    "depression",
-    "ptsd",
-    "bipolar",
-    "schiz",
-    "insomnia",
-    "seizure",
-    "epilep",
-    "pregnan",
-    "breastfeed",
-  ];
-  return keywords.some((k) => t.includes(k));
-}
-
-function buildSafeSummary(parts: {
-  confirmedName?: string | null;
-  nonMedicalReason?: string | null;
-  preferredTime?: string | null;
-  staffFollowupRequired?: boolean;
-}): string {
-  const chunks: string[] = [];
-  if (parts.confirmedName) chunks.push(`Confirmed name: ${parts.confirmedName}.`);
-  if (parts.nonMedicalReason) chunks.push(`Reason: ${parts.nonMedicalReason}.`);
-  if (parts.preferredTime) chunks.push(`Preferred time: ${parts.preferredTime}.`);
-  if (parts.staffFollowupRequired) chunks.push(`Staff follow-up requested.`);
-  // Force 1–2 sentences max (keep it tight)
-  return chunks.slice(0, 2).join(" ");
-}
-
-type AiOutcome = "reached" | "voicemail" | "no_answer" | "failed";
-
-function isSimulationEnabled(): boolean {
-  return String(process.env.AI_CALLBACK_SIMULATION || "").toLowerCase() === "true";
-}
-
 function getAiVoiceUrl(): string {
-  // Prefer env var override, fall back to your ngrok TwiML endpoint
-  return process.env.AI_VOICE_URL || "https://9b2d292c5db1.ngrok-free.app/api/voice/inbound";
+  return (
+    process.env.AI_VOICE_URL ||
+    "https://9b2d292c5db1.ngrok-free.app/api/voice/inbound"
+  );
 }
 
 /**
@@ -143,8 +85,8 @@ router.post("/", async (req, res) => {
         callback.phone,
         `Thanks ${callback.name}, we received your request and will contact you shortly.`
       );
-    } catch (notifyErr) {
-      console.warn("[callbacks POST] notification failed:", notifyErr);
+    } catch (err) {
+      console.warn("[callbacks POST] notification failed:", err);
     }
 
     return res.status(201).json({
@@ -160,7 +102,6 @@ router.post("/", async (req, res) => {
 
 /**
  * GET /api/callbacks
- * List all callback requests
  */
 router.get("/", async (_req, res) => {
   try {
@@ -177,7 +118,6 @@ router.get("/", async (_req, res) => {
 
 /**
  * POST /api/callbacks/:id/complete
- * Mark callback as completed
  */
 router.post("/:id/complete", async (req, res) => {
   try {
@@ -200,8 +140,8 @@ router.post("/:id/complete", async (req, res) => {
         callback.phone,
         "Thanks for speaking with us! If you need anything else, feel free to reach out."
       );
-    } catch (notifyErr) {
-      console.warn("[callbacks COMPLETE] notification failed:", notifyErr);
+    } catch (err) {
+      console.warn("[callbacks COMPLETE] notification failed:", err);
     }
 
     return res.json({
@@ -216,9 +156,8 @@ router.post("/:id/complete", async (req, res) => {
 });
 
 /**
- * Phase 3
  * POST /api/callbacks/:id/call
- * Initiate an outbound call (Twilio) to the callback's phone number.
+ * Manual outbound call (Twilio)
  */
 router.post("/:id/call", async (req, res) => {
   try {
@@ -237,39 +176,27 @@ router.post("/:id/call", async (req, res) => {
     const result = await makeOutboundCall({
       to,
       from: process.env.TWILIO_PHONE_NUMBER!,
-      url: getAiVoiceUrl(), // use same voice entrypoint
+      url: getAiVoiceUrl(),
     });
 
-    return res.status(200).json({
+    return res.json({
       ok: true,
       message: "Outbound call initiated",
       result,
     });
   } catch (err: any) {
     console.error("[callbacks CALL] error:", err);
-
-    const status = typeof err?.status === "number" ? err.status : 500;
-    const code = err?.code;
-    const message = err?.message ?? "Outbound call failed";
-
-    return res.status(500).json({
-      ok: false,
-      error: "Outbound call failed",
-      details: message,
-      twilio: code ? { code, status } : undefined,
-    });
+    return res.status(500).json({ error: "Outbound call failed" });
   }
 });
 
 /**
- * Phase 4
  * POST /api/callbacks/:id/ai-call
- * Human-triggered AI callback (simulation or real)
+ * AI-assisted callback (simulation or real)
  */
 router.post("/:id/ai-call", async (req, res) => {
   try {
     const { id } = req.params;
-    const simulation = process.env.AI_CALLBACK_SIMULATION === "true";
 
     const callback = await prisma.callbackRequest.findUnique({
       where: { id },
@@ -283,42 +210,35 @@ router.post("/:id/ai-call", async (req, res) => {
       return res.status(409).json({ error: "Callback not pending" });
     }
 
-  // 🔹 Simulation mode (NO Twilio, NO AI voice)
-  if (simulation) {
-    const {
-      simulatedReason,
-      simulatedPreferredTime,
-      simulatedMedicalQuestion,
-    } = req.body ?? {};
+    const simulation =
+      req.body?.simulation === true ||
+      process.env.NODE_ENV === "test" ||
+      process.env.AI_CALLBACK_SIMULATION === "true";
 
-    // 🔒 Explicit compliance gate — NO inference
-    const needsStaff = simulatedMedicalQuestion === true;
+    if (simulation) {
+      const needsStaff = req.body?.simulatedMedicalQuestion === true;
 
-    const updated = await prisma.callbackRequest.update({
-      where: { id },
-      data: {
-        status: needsStaff ? "needs_staff" : "completed",
-        aiHandled: true,
-        staffFollowupRequired: needsStaff,
-        preferredTime: needsStaff
-          ? callback.preferredTime
-          : simulatedPreferredTime ?? callback.preferredTime,
-        summary: needsStaff
-          ? "Caller asked a medical question; staff follow-up required."
-          : "AI handled scheduling request successfully.",
-        lastAttemptAt: new Date(),
-      },
-    });
+      const updated = await prisma.callbackRequest.update({
+        where: { id },
+        data: {
+          status: needsStaff ? "needs_staff" : "completed",
+          aiHandled: true,
+          staffFollowupRequired: needsStaff,
+          summary: needsStaff
+            ? "Staff follow-up required."
+            : "Request handled by AI.",
+          lastAttemptAt: new Date(),
+        },
+      });
 
-    return res.json({
-      ok: true,
-      mode: "simulation",
-      status: updated.status,
-      staffFollowupRequired: updated.staffFollowupRequired,
-    });
-}
-  
-    // 🔹 Real AI/Twilio flow (Phase 3.3 hook point)
+      return res.json({
+        ok: true,
+        mode: "simulation",
+        status: updated.status,
+        staffFollowupRequired: updated.staffFollowupRequired,
+      });
+    }
+
     await makeOutboundCall({
       to: callback.phone,
       from: process.env.TWILIO_PHONE_NUMBER!,

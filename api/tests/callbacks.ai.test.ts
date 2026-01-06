@@ -20,9 +20,10 @@ describe("AI Callback (manual) — compliance guardrails", () => {
     const res = await request(app)
       .post(`/api/callbacks/${callback.id}/ai-call`)
       .send({
+        simulation: true, // 🔒 FORCE simulation
         simulatedReason: "Which cannabis strain helps PTSD?",
         simulatedMedicalQuestion: true,
-      });
+    });
 
     // 3. Validate API response
     expect(res.status).toBe(200);

@@ -74,14 +74,14 @@ model CallbackRequest {
   status        String
   source        String   @default("sms")
 
-  // Phase 4 fields
-  aiHandled     Boolean  @default(false)
-  lastAttemptAt DateTime?
-  outcome       String?
-  confirmedName String?
-  nonMedicalReason String?
-  staffFollowupRequired Boolean @default(false)
-  summary       String?
+// Phase 4 fields (NON-PHI)
+  aiHandled            Boolean   @default(false)
+  aiOutcome            String?   // "reached" | "voicemail" | "no_answer" | "failed"
+  lastAttemptAt         DateTime?
+  confirmedName        String?
+  nonMedicalReason     String?
+  staffFollowupRequired Boolean  @default(false)
+  summary              String?
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

@@ -1,5 +1,14 @@
 # VetCan
 
+## ⚠️ Codex / Cloud Execution Note
+
+This project pins Prisma to v5.22.0.
+Some cloud execution environments (including Codex)
+force-install Prisma v7+, which is incompatible.
+
+✅ Local development and GitHub Actions CI are the source of truth.
+❌ Do not rely on Codex execution results for this repository.
+
 VetCan is a lightweight, clinic-style CRM + automation platform designed for **medical cannabis workflows** (and adjacent dispensary-style operations): appointments, callbacks, follow-ups, and operational visibility — with a clear path to SMS/voice automation (Twilio-ready).
 
 > ⚠️ **Compliance disclaimer:** VetCan is *HIPAA-aware* but **not a HIPAA compliance guarantee**. Professional legal/security review is required for any production use involving patient/health data.

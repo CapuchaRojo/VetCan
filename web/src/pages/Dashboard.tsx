@@ -19,23 +19,35 @@ type Callback = {
 
 export default function Dashboard() {
   const [callbacks, setCallbacks] = useState<Callback[]>([]);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
 
   useEffect(() => {
-    fetch("/api/callbacks")
-      .then(res => res.json())
-      .then((data: Callback[]) => {
+    const fetchCallbacks = async () => {
+      try {
+        const res = await fetch("/api/callbacks");
+        const data = await res.json();
         setCallbacks(data);
+        setLastUpdated(new Date());
         setLoading(false);
-      })
-      .catch(err => {
-        console.error("Failed to load callbacks", err);
+      } catch (err) {
+        console.error("Failed to fetch callbacks", err);
         setLoading(false);
-      });
-  }, []);
+      }
+    };
+
+  // initial load
+  fetchCallbacks();
+
+  // auto-refresh every 15s
+  const interval = setInterval(fetchCallbacks, 15000);
+
+  // cleanup
+  return () => clearInterval(interval);
+}, []);
 
   const todayCount = callbacks.filter(cb => {
     const created = new Date(cb.createdAt);
@@ -89,6 +101,13 @@ export default function Dashboard() {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <h1 className="text-2xl font-semibold mb-1">VetCan Admin Dashboard</h1>
+
+      {lastUpdated && (
+        <small className="block text-gray-400 mb-2">
+          Auto-refreshing • Last update {lastUpdated.toLocaleTimeString()}
+        </small>
+      )}
+
       <p className="text-gray-500 mb-6">Welcome to the control center.</p>
 
       {/* Stats */}

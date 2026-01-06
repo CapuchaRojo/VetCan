@@ -283,35 +283,41 @@ router.post("/:id/ai-call", async (req, res) => {
       return res.status(409).json({ error: "Callback not pending" });
     }
 
-    // 🔹 Simulation mode (NO Twilio, NO AI voice)
-    if (simulation) {
-      const { simulatedReason, simulatedPreferredTime } = req.body ?? {};
+  // 🔹 Simulation mode (NO Twilio, NO AI voice)
+  if (simulation) {
+    const {
+      simulatedReason,
+      simulatedPreferredTime,
+      simulatedMedicalQuestion,
+    } = req.body ?? {};
 
-      const needsStaff =
-        simulatedReason === "medical" || simulatedReason === "medical_question";
+    // 🔒 Explicit compliance gate — NO inference
+    const needsStaff = simulatedMedicalQuestion === true;
 
-      const updated = await prisma.callbackRequest.update({
-        where: { id },
-        data: {
-          status: needsStaff ? "needs_staff" : "completed",
-          aiHandled: true,
-          staffFollowupRequired: needsStaff,
-          preferredTime: simulatedPreferredTime ?? callback.preferredTime,
-          summary: needsStaff
-            ? "Caller asked a medical question; staff follow-up required."
-            : "AI handled scheduling request successfully.",
-          lastAttemptAt: new Date(),
-        },
-      });
+    const updated = await prisma.callbackRequest.update({
+      where: { id },
+      data: {
+        status: needsStaff ? "needs_staff" : "completed",
+        aiHandled: true,
+        staffFollowupRequired: needsStaff,
+        preferredTime: needsStaff
+          ? callback.preferredTime
+          : simulatedPreferredTime ?? callback.preferredTime,
+        summary: needsStaff
+          ? "Caller asked a medical question; staff follow-up required."
+          : "AI handled scheduling request successfully.",
+        lastAttemptAt: new Date(),
+      },
+    });
 
-      return res.json({
-        ok: true,
-        mode: "simulation",
-        status: updated.status,
-        staffFollowupRequired: updated.staffFollowupRequired,
-      });
-    }
-
+    return res.json({
+      ok: true,
+      mode: "simulation",
+      status: updated.status,
+      staffFollowupRequired: updated.staffFollowupRequired,
+    });
+}
+  
     // 🔹 Real AI/Twilio flow (Phase 3.3 hook point)
     await makeOutboundCall({
       to: callback.phone,

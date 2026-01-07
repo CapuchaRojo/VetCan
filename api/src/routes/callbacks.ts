@@ -4,22 +4,6 @@ import prisma from "../prisma";
 import { notificationProvider } from "../services/notifications";
 import { makeOutboundCall } from "../services/outboundCall";
 
-/**
- * Phase 1 (Non-PHI) Callback Requests
- *
- * Allowed data:
- * - name (required)
- * - phone (required)
- * - preferredTime (optional)
- * - requestType (optional, non-medical)
- *
- * Disallowed:
- * - symptoms
- * - diagnoses
- * - medications
- * - medical history
- */
-
 const router = Router();
 
 const ALLOWED_REQUEST_TYPES = [
@@ -40,6 +24,22 @@ function getAiVoiceUrl(): string {
   return (
     process.env.AI_VOICE_URL ||
     "https://9b2d292c5db1.ngrok-free.app/api/voice/inbound"
+  );
+}
+
+function isDemoRequest(req: any): boolean {
+  return (
+    req.query?.demo === "true" ||
+    req.body?.demo === true ||
+    String(process.env.DEMO_MODE || "").toLowerCase() === "true"
+  );
+}
+
+function isSimulationRequest(req: any): boolean {
+  return (
+    req.body?.simulation === true ||
+    process.env.NODE_ENV === "test" ||
+    String(process.env.AI_CALLBACK_SIMULATION || "").toLowerCase() === "true"
   );
 }
 
@@ -80,6 +80,7 @@ router.post("/", async (req, res) => {
       },
     });
 
+    // best-effort notification
     try {
       await notificationProvider.send(
         callback.phone,
@@ -108,7 +109,6 @@ router.get("/", async (_req, res) => {
     const callbacks = await prisma.callbackRequest.findMany({
       orderBy: { createdAt: "desc" },
     });
-
     return res.json(callbacks);
   } catch (err) {
     console.error("[callbacks GET] error:", err);
@@ -135,6 +135,7 @@ router.post("/:id/complete", async (req, res) => {
       data: { status: "completed" },
     });
 
+    // best-effort notification
     try {
       await notificationProvider.send(
         callback.phone,
@@ -158,13 +159,27 @@ router.post("/:id/complete", async (req, res) => {
 /**
  * POST /api/callbacks/:id/call
  * Manual outbound call (Twilio)
+ * Supports demo=true to avoid dialing Twilio during demos.
  */
 router.post("/:id/call", async (req, res) => {
   try {
     const { id } = req.params;
+    const demo = isDemoRequest(req);
 
     const callback = await prisma.callbackRequest.findUnique({ where: { id } });
     if (!callback) return res.status(404).json({ error: "Callback not found" });
+
+    // DEMO: do not call Twilio, do not mutate DB
+    if (demo) {
+      return res.json({
+        ok: true,
+        mode: "demo",
+        demo: true,
+        message: "Demo mode: outbound call suppressed (no Twilio call made).",
+        callbackId: callback.id,
+        to: callback.phone,
+      });
+    }
 
     if (callback.status === "completed") {
       return res.status(409).json({ error: "Callback already completed" });
@@ -192,29 +207,50 @@ router.post("/:id/call", async (req, res) => {
 
 /**
  * POST /api/callbacks/:id/ai-call
- * AI-assisted callback (simulation or real)
+ * AI-assisted callback:
+ * - demo=true: NO DB writes, NO Twilio, returns synthetic callback object
+ * - simulation: mutates DB (used in tests/dev)
+ * - real: Twilio + minimal DB update
  */
 router.post("/:id/ai-call", async (req, res) => {
   try {
     const { id } = req.params;
 
-    const callback = await prisma.callbackRequest.findUnique({
-      where: { id },
-    });
+    const callback = await prisma.callbackRequest.findUnique({ where: { id } });
+    if (!callback) return res.status(404).json({ error: "Callback not found" });
 
-    if (!callback) {
-      return res.status(404).json({ error: "Callback not found" });
+    const demo = isDemoRequest(req);
+
+    // 🔹 DEMO MODE (no DB writes, no mutations)
+    // NOTE: We intentionally bypass "pending" check in demo mode so you can demo on any record safely.
+    if (demo) {
+      const simulatedMedicalQuestion = req.body?.simulatedMedicalQuestion === true;
+
+      return res.json({
+        ok: true,
+        mode: "demo",
+        demo: true,
+        callback: {
+          ...callback,
+          aiHandled: true,
+          staffFollowupRequired: simulatedMedicalQuestion,
+          status: simulatedMedicalQuestion ? "needs_staff" : "completed",
+          summary: simulatedMedicalQuestion
+            ? "Caller asked a medical question; staff follow-up required."
+            : "AI handled scheduling request successfully.",
+          lastAttemptAt: new Date().toISOString(),
+        },
+      });
     }
 
+    // Outside demo mode, we enforce the pending-only rule
     if (callback.status !== "pending") {
       return res.status(409).json({ error: "Callback not pending" });
     }
 
-    const simulation =
-      req.body?.simulation === true ||
-      process.env.NODE_ENV === "test" ||
-      process.env.AI_CALLBACK_SIMULATION === "true";
+    const simulation = isSimulationRequest(req);
 
+    // 🔹 SIMULATION MODE (DB writes allowed; used in tests/dev)
     if (simulation) {
       const needsStaff = req.body?.simulatedMedicalQuestion === true;
 
@@ -225,8 +261,9 @@ router.post("/:id/ai-call", async (req, res) => {
           aiHandled: true,
           staffFollowupRequired: needsStaff,
           summary: needsStaff
-            ? "Staff follow-up required."
-            : "Request handled by AI.",
+            ? "Caller request requires staff follow-up."
+            : "AI handled scheduling request successfully.",
+
           lastAttemptAt: new Date(),
         },
       });
@@ -239,6 +276,7 @@ router.post("/:id/ai-call", async (req, res) => {
       });
     }
 
+    // 🔹 REAL TWILIO PATH
     await makeOutboundCall({
       to: callback.phone,
       from: process.env.TWILIO_PHONE_NUMBER!,

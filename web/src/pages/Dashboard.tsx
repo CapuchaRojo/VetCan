@@ -25,7 +25,8 @@ export default function Dashboard() {
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-
+  const [demoIds, setDemoIds] = useState<Set<string>>(new Set());
+  
   useEffect(() => {
     const fetchCallbacks = async () => {
       try {
@@ -80,23 +81,41 @@ export default function Dashboard() {
       }
     });
 
-  async function attemptAiCallback(id: string) {
-    try {
-      setLoadingId(id);
+    async function attemptAiCallback(id: string) {
+      try {
+        setLoadingId(id);
 
-      const res = await fetch(`/api/callbacks/${id}/ai-call`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ simulatedReason: "scheduling" }),
-      });
+        const res = await fetch(
+        `/api/callbacks/${id}/ai-call?demo=true`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            demo: true,
+            simulatedMedicalQuestion: false,
+          }),
+        }
+      );
 
+      const data = await res.json();
       if (!res.ok) throw new Error("AI callback failed");
 
+      // ✅ DEMO MODE: update UI only, no DB reload
+      if (data.demo && data.callback) {
+        setCallbacks(prev =>
+          prev.map(cb => (cb.id === id ? data.callback : cb))
+        );
+
+        setDemoIds(prev => new Set(prev).add(id));
+
+        setToast("Demo AI callback executed (no data saved)");
+        setTimeout(() => setToast(null), 3000);
+        return;
+      }
+
+      // 🔁 Non-demo fallback
       const updated = await fetch("/api/callbacks").then(r => r.json());
       setCallbacks(updated);
-
-      setToast("AI callback processed successfully");
-      setTimeout(() => setToast(null), 3000);
     } catch (err) {
       console.error("AI callback error", err);
       alert("AI callback attempt failed");
@@ -206,7 +225,15 @@ export default function Dashboard() {
               >
                 <td>{cb.name}</td>
                 <td>{cb.phone}</td>
-                <td>{cb.status}</td>
+                <td className="flex items-center gap-2">
+                  <span>{cb.status}</span>
+
+                  {demoIds.has(cb.id) && (
+                    <span className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700">
+                      DEMO
+                    </span>
+                  )}
+                  </td>
                 <td>
                   {cb.aiHandled ? (
                     <span className="inline-flex items-center gap-1 animate-pulse">
@@ -216,7 +243,19 @@ export default function Dashboard() {
                     "—"
                   )}
                 </td>
-                <td>{cb.staffFollowupRequired ? "⚠️" : "—"}</td>
+                <td>
+                  {cb.staffFollowupRequired ? (
+                    <span
+                      title="AI detected content requiring human review. No medical details were stored."
+                      className="cursor-help"
+                    >
+                      ⚠️
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+
                 <td>{cb.summary ?? "—"}</td>
                 <td>{new Date(cb.createdAt).toLocaleString()}</td>
                 <td>

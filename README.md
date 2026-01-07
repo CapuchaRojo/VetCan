@@ -41,6 +41,56 @@ VetCan is built to demo cleanly and convincingly:
 - Automatic escalation when medical questions are detected
 - Real-time admin dashboard updates
 
+---
+
+## Demo, Simulation, and Real Execution Modes
+
+VetCan deliberately separates **presentation**, **testing**, and **production** behavior to prevent
+data contamination and ensure compliance.
+
+---
+
+### 🟦 Demo Mode (Non-Persistent)
+**Purpose:** Sales demos, UI walkthroughs, investor presentations  
+**How:** `?demo=true` or `DEMO_MODE=true`
+
+- ❌ No database writes
+- ❌ No state mutations
+- ❌ No PHI risk
+- ✅ Returns realistic, synthetic responses
+- ✅ UI updates locally only
+
+> Demo mode is visually indistinguishable from real operation, but leaves **zero footprint**.
+
+---
+
+### 🟨 Simulation Mode (Persistent, Test-Safe)
+**Purpose:** Automated tests, local development, CI verification  
+**How:** `NODE_ENV=test` or `AI_CALLBACK_SIMULATION=true`
+
+- ✅ Writes to database
+- ✅ Enforces compliance-safe summaries
+- ❌ Never stores medical details or PHI
+- ✅ Used by Jest test suite
+
+### Simulation mode proves guardrails work under real persistence.
+
+---
+
+### 🟥 Real Execution Mode (Production)
+**Purpose:** Live clinic operations  
+**How:** Default behavior with integrations enabled
+
+- ✅ Twilio voice/SMS
+- ✅ Staff notifications
+- ✅ Auditable records
+- 🔒 Requires legal + security review for regulated environments
+
+---
+
+### This separation is intentional and enforced by tests.
+
+
 ### Live demo flow
 1. A callback request is created (API or UI)
 2. AI attempts to handle the callback

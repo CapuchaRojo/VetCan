@@ -1,13 +1,26 @@
+// api/src/routes/voice.ts
 import { Router } from "express";
 import twilio from "twilio";
 import prisma from "../prisma";
-import { classifyIntent } from "../services/voiceIntent";
+import { classifyIntent } from "../voice/voiceIntents";
+import { VOICE_LINES } from "../voice/voiceLines";
+import { pickLine } from "../voice/pickLine";
 
 const router = Router();
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 /**
+ * Shared Twilio voice config
+ * (Polly is configured at the Twilio account level)
+ */
+const VOICE = {
+  voice: "alice" as const,
+  rate: "90%",
+};
+
+/**
  * POST /api/voice/inbound
+ * Initial inbound call
  */
 router.post("/voice/inbound", (_req, res) => {
   const twiml = new VoiceResponse();
@@ -20,7 +33,10 @@ router.post("/voice/inbound", (_req, res) => {
   });
 
   gather.say(
-    "Thanks for calling. I can help schedule a callback. Please tell me what you need."
+    VOICE,
+    `${pickLine(VOICE_LINES.greeting)} ${pickLine(
+      VOICE_LINES.intentPrompt
+    )}`
   );
 
   res.type("text/xml").send(twiml.toString());
@@ -28,36 +44,35 @@ router.post("/voice/inbound", (_req, res) => {
 
 /**
  * POST /api/voice/intent
+ * Classify caller intent
  */
 router.post("/voice/intent", (req, res) => {
   const twiml = new VoiceResponse();
-  const speech = req.body.SpeechResult || "";
+  const speech = String(req.body.SpeechResult || "").trim();
 
-  if (!speech.trim()) {
-  twiml.say("I didn't hear anything. Please try again.");
-  twiml.redirect("/api/voice/inbound");
-  return res.type("text/xml").send(twiml.toString());
-}
+  if (!speech) {
+    twiml.say(VOICE, pickLine(VOICE_LINES.retry));
+    twiml.redirect("/api/voice/inbound");
+    return res.type("text/xml").send(twiml.toString());
+  }
 
-  const intent = classifyIntent(speech);
+  const { intent } = classifyIntent(speech);
 
   switch (intent) {
     case "callback":
     case "scheduling":
     case "general_question":
-      twiml.say("I will arrange a callback for you.");
+      twiml.say(VOICE, pickLine(VOICE_LINES.schedulingConfirm));
       twiml.redirect("/api/voice/name");
       break;
 
     case "operator":
-      twiml.say("Please hold while I notify a representative.");
+      twiml.say(VOICE, pickLine(VOICE_LINES.staffHandoff));
       twiml.hangup();
       break;
 
     default:
-      twiml.say(
-        "Sorry, I did not understand that. Please say callback or appointment."
-      );
+      twiml.say(VOICE, pickLine(VOICE_LINES.unknownIntent));
       twiml.redirect("/api/voice/inbound");
   }
 
@@ -66,118 +81,100 @@ router.post("/voice/intent", (req, res) => {
 
 /**
  * POST /api/voice/name
+ * Collect caller name
  */
-router.post("/voice/name", (req, res) => {
+router.post("/voice/name", (_req, res) => {
   const twiml = new VoiceResponse();
-  const name = req.body.SpeechResult;
-
-  if (!name) {
-    twiml.say("Sorry, I did not catch that.");
-    twiml.redirect("/api/voice/inbound");
-    return res.type("text/xml").send(twiml.toString());
-  }
 
   const gather = twiml.gather({
-    input: ["speech", "dtmf"],
-    action: `/api/voice/phone?name=${encodeURIComponent(name)}`,
+    input: ["speech"],
+    action: "/api/voice/phone",
     method: "POST",
     speechTimeout: "auto",
   });
 
-  gather.say("Thanks. What is the best phone number to reach you?");
+  gather.say(VOICE, pickLine(VOICE_LINES.reassurance));
 
   res.type("text/xml").send(twiml.toString());
 });
 
 /**
  * POST /api/voice/phone
+ * Collect phone number
  */
 router.post("/voice/phone", (req, res) => {
   const twiml = new VoiceResponse();
-  const name = req.query.name as string;
+  const name = String(req.body.SpeechResult || "").trim();
 
-  const rawPhone = req.body.SpeechResult || req.body.Digits;
-
-  if (!rawPhone) {
-    twiml.say("Sorry, I did not catch the phone number.");
+  if (!name) {
+    twiml.say(VOICE, pickLine(VOICE_LINES.retry));
     twiml.redirect("/api/voice/name");
     return res.type("text/xml").send(twiml.toString());
   }
 
-  const normalizedPhone = String(rawPhone).replace(/[^\d+]/g, "");
-
   const gather = twiml.gather({
-    input: ["speech"],
-    action: `/api/voice/time?name=${encodeURIComponent(
-      name
-    )}&phone=${encodeURIComponent(normalizedPhone)}`,
+    input: ["speech", "dtmf"],
+    action: `/api/voice/time?name=${encodeURIComponent(name)}`,
     method: "POST",
     speechTimeout: "auto",
   });
 
-  gather.say("What time works best for a callback?");
+  gather.say(VOICE, pickLine(VOICE_LINES.reassurance));
 
   res.type("text/xml").send(twiml.toString());
 });
 
 /**
  * POST /api/voice/time
+ * Collect preferred callback time + create callback record
  */
 router.post("/voice/time", async (req, res) => {
   const twiml = new VoiceResponse();
-  const { name, phone } = req.query;
-  const preferredTime = req.body.SpeechResult || null;
+
+  const name = String(req.query.name || "").trim();
+  const rawPhone = req.body.SpeechResult || req.body.Digits || "";
+  const preferredTime = String(req.body.SpeechResult || "").trim() || null;
+
+  const phone = String(rawPhone).replace(/[^\d+]/g, "");
+
+  if (!name || !phone) {
+    twiml.say(VOICE, pickLine(VOICE_LINES.retry));
+    twiml.redirect("/api/voice/inbound");
+    return res.type("text/xml").send(twiml.toString());
+  }
 
   try {
     await prisma.callbackRequest.create({
       data: {
-        name: String(name),
-        phone: String(phone),
+        name,
+        phone,
         preferredTime,
         status: "pending",
       },
     });
 
-    twiml.say(
-      "Thank you. Our staff will call you back shortly. Have a great day."
-    );
+    twiml.say(VOICE, pickLine(VOICE_LINES.schedulingConfirm));
+    twiml.say(VOICE, pickLine(VOICE_LINES.staffHandoff));
     twiml.hangup();
   } catch (err) {
     console.error("[voice callback error]", err);
-    twiml.say("Sorry, something went wrong. Please call back later.");
+    twiml.say(VOICE, pickLine(VOICE_LINES.retry));
     twiml.hangup();
   }
 
   res.type("text/xml").send(twiml.toString());
 });
+
 /**
  * POST /api/voice/outbound
- * Used by Twilio when we place an outbound call
+ * Used when we place an outbound call via Twilio
  */
-router.post("/voice/outbound", (req, res) => {
-  const twiml = new VoiceResponse();
-
-  twiml.say(
-    "Hello. This is VetCan returning your call. Please stay on the line."
-  );
-
-  twiml.pause({ length: 1 });
-
-  twiml.say(
-    "A representative will be with you shortly."
-  );
-
-  twiml.hangup();
-
-  res.type("text/xml").send(twiml.toString());
-});
-
 router.post("/voice/outbound", (_req, res) => {
   const twiml = new VoiceResponse();
 
-  twiml.say(
-    "Hello, this is VetCan returning your call. Please stay on the line while we connect you."
-  );
+  twiml.say(VOICE, pickLine(VOICE_LINES.greeting));
+  twiml.pause({ length: 1 });
+  twiml.say(VOICE, pickLine(VOICE_LINES.staffHandoff));
 
   res.type("text/xml").send(twiml.toString());
 });

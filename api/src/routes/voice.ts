@@ -1,17 +1,16 @@
-// api/src/routes/voice.ts
 import { Router } from "express";
 import twilio from "twilio";
 import prisma from "../prisma";
 import { classifyIntent } from "../voice/voiceIntents";
 import { VOICE_LINES } from "../voice/voiceLines";
 import { pickLine } from "../voice/pickLine";
+import { humanizeLine } from "../voice/humanize";
 
 const router = Router();
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 /**
  * Shared Twilio voice config
- * (Polly is configured at the Twilio account level)
  */
 const VOICE = {
   voice: "alice" as const,
@@ -20,7 +19,6 @@ const VOICE = {
 
 /**
  * POST /api/voice/inbound
- * Initial inbound call
  */
 router.post("/voice/inbound", (_req, res) => {
   const twiml = new VoiceResponse();
@@ -32,19 +30,17 @@ router.post("/voice/inbound", (_req, res) => {
     speechTimeout: "auto",
   });
 
-  gather.say(
-    VOICE,
-    `${pickLine(VOICE_LINES.greeting)} ${pickLine(
-      VOICE_LINES.intentPrompt
-    )}`
-  );
+  const line = `${pickLine(VOICE_LINES.greeting)} ${pickLine(
+    VOICE_LINES.intentPrompt
+  )}`;
+
+  gather.say(VOICE, humanizeLine(line));
 
   res.type("text/xml").send(twiml.toString());
 });
 
 /**
  * POST /api/voice/intent
- * Classify caller intent
  */
 router.post("/voice/intent", (req, res) => {
   const twiml = new VoiceResponse();
@@ -56,7 +52,14 @@ router.post("/voice/intent", (req, res) => {
     return res.type("text/xml").send(twiml.toString());
   }
 
-  const { intent } = classifyIntent(speech);
+  const { intent, confidence } = classifyIntent(speech);
+
+  if (confidence < 0.4) {
+    twiml.say(
+      VOICE,
+      humanizeLine(pickLine(VOICE_LINES.reassurance))
+    );
+  }
 
   switch (intent) {
     case "callback":
@@ -81,7 +84,6 @@ router.post("/voice/intent", (req, res) => {
 
 /**
  * POST /api/voice/name
- * Collect caller name
  */
 router.post("/voice/name", (_req, res) => {
   const twiml = new VoiceResponse();
@@ -100,7 +102,6 @@ router.post("/voice/name", (_req, res) => {
 
 /**
  * POST /api/voice/phone
- * Collect phone number
  */
 router.post("/voice/phone", (req, res) => {
   const twiml = new VoiceResponse();
@@ -126,7 +127,6 @@ router.post("/voice/phone", (req, res) => {
 
 /**
  * POST /api/voice/time
- * Collect preferred callback time + create callback record
  */
 router.post("/voice/time", async (req, res) => {
   const twiml = new VoiceResponse();
@@ -161,20 +161,6 @@ router.post("/voice/time", async (req, res) => {
     twiml.say(VOICE, pickLine(VOICE_LINES.retry));
     twiml.hangup();
   }
-
-  res.type("text/xml").send(twiml.toString());
-});
-
-/**
- * POST /api/voice/outbound
- * Used when we place an outbound call via Twilio
- */
-router.post("/voice/outbound", (_req, res) => {
-  const twiml = new VoiceResponse();
-
-  twiml.say(VOICE, pickLine(VOICE_LINES.greeting));
-  twiml.pause({ length: 1 });
-  twiml.say(VOICE, pickLine(VOICE_LINES.staffHandoff));
 
   res.type("text/xml").send(twiml.toString());
 });

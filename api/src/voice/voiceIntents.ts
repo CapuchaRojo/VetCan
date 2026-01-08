@@ -13,11 +13,6 @@ export type IntentResult = {
   medicalFlag: boolean;
 };
 
-/**
- * Keywords that indicate medical content.
- * We detect this separately so we can respond safely
- * without classifying it as a primary intent.
- */
 const MEDICAL_KEYWORDS = [
   "pain",
   "diagnosis",
@@ -28,7 +23,6 @@ const MEDICAL_KEYWORDS = [
   "condition",
   "symptom",
   "medication",
-  "strain",
 ];
 
 const INTENT_KEYWORDS: Record<Intent, string[]> = {
@@ -39,28 +33,13 @@ const INTENT_KEYWORDS: Record<Intent, string[]> = {
   unknown: [],
 };
 
-const UNCERTAINTY_MARKERS = [
-  "maybe",
-  "not sure",
-  "i think",
-  "kind of",
-  "uh",
-  "um",
-];
+const UNCERTAINTY_MARKERS = ["maybe", "not sure", "i think", "kind of", "uh", "um"];
 
-/**
- * Classify caller intent from speech text.
- * This function ALWAYS returns a value.
- */
 export function classifyIntent(text: string): IntentResult {
   const normalized = text.toLowerCase();
 
-  // ---- medical detection (side-channel) ----
-  const medicalFlag = MEDICAL_KEYWORDS.some(k =>
-    normalized.includes(k)
-  );
+  const medicalFlag = MEDICAL_KEYWORDS.some((k) => normalized.includes(k));
 
-  // ---- intent scoring ----
   let bestIntent: Intent = "unknown";
   let bestScore = 0;
 
@@ -78,20 +57,13 @@ export function classifyIntent(text: string): IntentResult {
     }
   }
 
-  // ---- confidence calculation ----
   let confidence = Math.min(1, bestScore / 2);
 
   for (const marker of UNCERTAINTY_MARKERS) {
-    if (normalized.includes(marker)) {
-      confidence -= 0.15;
-    }
+    if (normalized.includes(marker)) confidence -= 0.15;
   }
 
   confidence = Math.max(0, Math.min(confidence, 1));
 
-  return {
-    intent: bestIntent,
-    confidence,
-    medicalFlag,
-  };
+  return { intent: bestIntent, confidence, medicalFlag };
 }

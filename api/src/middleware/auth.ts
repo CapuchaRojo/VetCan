@@ -1,6 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
+// Validate JWT secret at startup - fail fast in production
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌ FATAL: JWT_SECRET must be set in production');
+    process.exit(1);
+  }
+  console.warn('⚠️  Using fallback JWT secret. Set JWT_SECRET in production.');
+}
+
 /**
  * Main auth middleware
  * Used by routes that require authentication
@@ -29,12 +39,12 @@ export default function requireAuth(
     // Verify the JWT token
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET || 'test-secret'
+      JWT_SECRET || 'test-secret'
     );
-    
+
     // Attach user info to request for downstream use
     (req as any).user = decoded;
-    
+
     next();
   } catch (error) {
     return res.status(401).json({ error: 'Invalid token' });
@@ -50,20 +60,20 @@ export function optionalAuth(
   next: NextFunction
 ) {
   const authHeader = req.headers.authorization;
-  
+
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.replace('Bearer ', '');
     try {
       const decoded = jwt.verify(
         token,
-        process.env.JWT_SECRET || 'test-secret'
+        JWT_SECRET || 'test-secret'
       );
       (req as any).user = decoded;
     } catch (error) {
       // Silently fail for optional auth
     }
   }
-  
+
   next();
 }
 

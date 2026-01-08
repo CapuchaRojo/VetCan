@@ -188,9 +188,14 @@ router.post("/:id/call", async (req, res) => {
     const to = normalizePhone(callback.phone);
     if (!to) return res.status(400).json({ error: "Callback phone is invalid" });
 
+    const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+    if (!fromNumber) {
+      return res.status(500).json({ error: 'TWILIO_PHONE_NUMBER not configured' });
+    }
+
     const result = await makeOutboundCall({
       to,
-      from: process.env.TWILIO_PHONE_NUMBER!,
+      from: fromNumber,
       url: getAiVoiceUrl(),
     });
 
@@ -277,10 +282,15 @@ router.post("/:id/ai-call", async (req, res) => {
     }
 
     // 🔹 REAL TWILIO PATH
+    const twimlUrl = process.env.TWIML_AI_CALLBACK_URL;
+    if (!twimlUrl) {
+      return res.status(500).json({ error: 'TWIML_AI_CALLBACK_URL not configured' });
+    }
+
     await makeOutboundCall({
       to: callback.phone,
       from: process.env.TWILIO_PHONE_NUMBER!,
-      url: process.env.TWIML_AI_CALLBACK_URL!,
+      url: twimlUrl,
     });
 
     await prisma.callbackRequest.update({

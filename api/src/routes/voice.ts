@@ -105,9 +105,12 @@ router.post("/voice/name", (_req, res) => {
  */
 router.post("/voice/phone", (req, res) => {
   const twiml = new VoiceResponse();
-  const name = String(req.body.SpeechResult || "").trim();
+  const rawName = String(req.body.SpeechResult || "").trim();
 
-  if (!name) {
+  // Validate name length and content to prevent injection
+  const name = rawName.slice(0, 100).replace(/[<>\"\'%;()&]/g, "");
+
+  if (!name || name.length < 1) {
     twiml.say(VOICE, pickLine(VOICE_LINES.retry));
     twiml.redirect("/api/voice/name");
     return res.type("text/xml").send(twiml.toString());

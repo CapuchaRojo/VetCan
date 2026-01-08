@@ -16,9 +16,10 @@ function getClient(): Twilio | null {
       console.warn('[NOTIFY] Twilio credentials missing. SMS disabled.');
       return null;
     }
- 
+
     if (!accountSid.startsWith('AC')) {
-      console.warn('[NOTIFY] Invalid Twilio Account SID format. SMS disabled.');
+      console.error('[NOTIFY] Invalid Twilio Account SID format. SMS disabled.');
+      return null;
     }
 
     client = twilio(accountSid, authToken);

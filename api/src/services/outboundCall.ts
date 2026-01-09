@@ -12,6 +12,10 @@ function getTwilioClient(): Twilio {
       throw new Error("Twilio credentials not configured");
     }
 
+    if (!sid.startsWith("AC")) {
+      throw new Error("Invalid Twilio Account SID format");
+    }
+
     client = twilio(sid, token);
   }
 

@@ -134,7 +134,8 @@ router.post("/voice/phone", (req, res) => {
 router.post("/voice/time", async (req, res) => {
   const twiml = new VoiceResponse();
 
-  const name = String(req.query.name || "").trim();
+  const rawName = String(req.query.name || "").trim();
+  const name = rawName.slice(0, 100).replace(/[<>\"\'%;()&]/g, "");
   const rawPhone = req.body.SpeechResult || req.body.Digits || "";
   const preferredTime = String(req.body.SpeechResult || "").trim() || null;
 

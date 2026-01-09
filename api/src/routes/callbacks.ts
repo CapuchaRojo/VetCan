@@ -287,9 +287,14 @@ router.post("/:id/ai-call", async (req, res) => {
       return res.status(500).json({ error: 'TWIML_AI_CALLBACK_URL not configured' });
     }
 
+    const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+    if (!fromNumber) {
+      return res.status(500).json({ error: 'TWILIO_PHONE_NUMBER not configured' });
+    }
+
     await makeOutboundCall({
       to: callback.phone,
-      from: process.env.TWILIO_PHONE_NUMBER!,
+      from: fromNumber,
       url: twimlUrl,
     });
 

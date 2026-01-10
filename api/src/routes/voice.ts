@@ -1,10 +1,18 @@
 import { Router } from "express";
 import twilio from "twilio";
 import prisma from "../prisma";
-import { classifyIntent } from "../voice/voiceIntents";
+import {
+  buildInboundPlan,
+  buildIntentPlan,
+  buildNamePlan,
+  buildPhonePlan,
+  buildTimePlan,
+  normalizePhone,
+  sanitizeName,
+} from "../voice/voiceFlow";
+import type { VoicePlan } from "../voice/types";
 import { VOICE_LINES } from "../voice/voiceLines";
 import { pickLine } from "../voice/pickLine";
-import { humanizeLine } from "../voice/humanize";
 
 const router = Router();
 const VoiceResponse = twilio.twiml.VoiceResponse;
@@ -17,24 +25,31 @@ const VOICE = {
   rate: "90%",
 };
 
+function applyPlan(twiml: twilio.twiml.VoiceResponse, plan: VoicePlan) {
+  const sayTarget = plan.gather
+    ? twiml.gather(plan.gather)
+    : twiml;
+
+  for (const line of plan.say) {
+    sayTarget.say(VOICE, line);
+  }
+
+  if (plan.redirect) {
+    twiml.redirect(plan.redirect);
+  }
+
+  if (plan.hangup) {
+    twiml.hangup();
+  }
+}
+
 /**
  * POST /api/voice/inbound
  */
 router.post("/voice/inbound", (_req, res) => {
   const twiml = new VoiceResponse();
-
-  const gather = twiml.gather({
-    input: ["speech"],
-    action: "/api/voice/intent",
-    method: "POST",
-    speechTimeout: "auto",
-  });
-
-  const line = `${pickLine(VOICE_LINES.greeting)} ${pickLine(
-    VOICE_LINES.intentPrompt
-  )}`;
-
-  gather.say(VOICE, humanizeLine(line));
+  const plan = buildInboundPlan();
+  applyPlan(twiml, plan);
 
   res.type("text/xml").send(twiml.toString());
 });
@@ -45,39 +60,8 @@ router.post("/voice/inbound", (_req, res) => {
 router.post("/voice/intent", (req, res) => {
   const twiml = new VoiceResponse();
   const speech = String(req.body.SpeechResult || "").trim();
-
-  if (!speech) {
-    twiml.say(VOICE, pickLine(VOICE_LINES.retry));
-    twiml.redirect("/api/voice/inbound");
-    return res.type("text/xml").send(twiml.toString());
-  }
-
-  const { intent, confidence } = classifyIntent(speech);
-
-  if (confidence < 0.4) {
-    twiml.say(
-      VOICE,
-      humanizeLine(pickLine(VOICE_LINES.reassurance))
-    );
-  }
-
-  switch (intent) {
-    case "callback":
-    case "scheduling":
-    case "general_question":
-      twiml.say(VOICE, pickLine(VOICE_LINES.schedulingConfirm));
-      twiml.redirect("/api/voice/name");
-      break;
-
-    case "operator":
-      twiml.say(VOICE, pickLine(VOICE_LINES.staffHandoff));
-      twiml.hangup();
-      break;
-
-    default:
-      twiml.say(VOICE, pickLine(VOICE_LINES.unknownIntent));
-      twiml.redirect("/api/voice/inbound");
-  }
+  const { plan } = buildIntentPlan(speech);
+  applyPlan(twiml, plan);
 
   res.type("text/xml").send(twiml.toString());
 });
@@ -87,15 +71,8 @@ router.post("/voice/intent", (req, res) => {
  */
 router.post("/voice/name", (_req, res) => {
   const twiml = new VoiceResponse();
-
-  const gather = twiml.gather({
-    input: ["speech"],
-    action: "/api/voice/phone",
-    method: "POST",
-    speechTimeout: "auto",
-  });
-
-  gather.say(VOICE, pickLine(VOICE_LINES.reassurance));
+  const plan = buildNamePlan();
+  applyPlan(twiml, plan);
 
   res.type("text/xml").send(twiml.toString());
 });
@@ -106,24 +83,8 @@ router.post("/voice/name", (_req, res) => {
 router.post("/voice/phone", (req, res) => {
   const twiml = new VoiceResponse();
   const rawName = String(req.body.SpeechResult || "").trim();
-
-  // Validate name length and content to prevent injection
-  const name = rawName.slice(0, 100).replace(/[<>\"\'%;()&]/g, "");
-
-  if (!name || name.length < 1) {
-    twiml.say(VOICE, pickLine(VOICE_LINES.retry));
-    twiml.redirect("/api/voice/name");
-    return res.type("text/xml").send(twiml.toString());
-  }
-
-  const gather = twiml.gather({
-    input: ["speech", "dtmf"],
-    action: `/api/voice/time?name=${encodeURIComponent(name)}`,
-    method: "POST",
-    speechTimeout: "auto",
-  });
-
-  gather.say(VOICE, pickLine(VOICE_LINES.reassurance));
+  const { plan } = buildPhonePlan(rawName);
+  applyPlan(twiml, plan);
 
   res.type("text/xml").send(twiml.toString());
 });
@@ -135,17 +96,21 @@ router.post("/voice/time", async (req, res) => {
   const twiml = new VoiceResponse();
 
   const rawName = String(req.query.name || "").trim();
-  const name = rawName.slice(0, 100).replace(/[<>\"\'%;()&]/g, "");
+  const name = sanitizeName(rawName);
   const rawPhone = req.body.SpeechResult || req.body.Digits || "";
   const preferredTime = String(req.body.SpeechResult || "").trim() || null;
 
-  const phone = String(rawPhone).replace(/[^\d+]/g, "");
+  const phone = normalizePhone(rawPhone);
 
-  if (!name || !phone) {
-    twiml.say(VOICE, pickLine(VOICE_LINES.retry));
-    twiml.redirect("/api/voice/inbound");
+  const result = buildTimePlan({ name, phone, preferredTime });
+
+  if (!result.ok && result.plan) {
+    applyPlan(twiml, result.plan);
     return res.type("text/xml").send(twiml.toString());
   }
+
+// success path continues unchanged
+
 
   try {
     await prisma.callbackRequest.create({

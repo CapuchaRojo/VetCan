@@ -3,6 +3,7 @@ import { Router } from "express";
 import prisma from "../prisma";
 import { notificationProvider } from "../services/notifications";
 import { makeOutboundCall } from "../services/outboundCall";
+import { emitEvent } from "../lib/events";
 
 const router = Router();
 
@@ -292,6 +293,7 @@ router.post("/:id/ai-call", async (req, res) => {
       return res.status(500).json({ error: 'TWILIO_PHONE_NUMBER not configured' });
     }
 
+    emitEvent("ai_call_initiated", { mode: "twilio" });
     await makeOutboundCall({
       to: callback.phone,
       from: fromNumber,

@@ -1,7 +1,18 @@
 // api/src/voice/types.ts
 import type { Intent } from "./voiceIntents";
 
-export type VoiceState = "inbound" | "intent" | "name" | "phone" | "time" | "complete";
+export const VOICE_TRANSITIONS = {
+  inbound: ["intent"],
+  intent: ["name", "inbound", "complete"],
+  name: ["phone"],
+  phone: ["time", "name"],
+  time: ["complete", "inbound"],
+  complete: [],
+} as const;
+
+export type VoiceState = keyof typeof VOICE_TRANSITIONS;
+export type NextStateFor<S extends VoiceState> =
+  (typeof VOICE_TRANSITIONS)[S][number];
 
 export type VoiceContext = {
   state: VoiceState;
@@ -13,9 +24,9 @@ export type VoiceContext = {
   preferredTime?: string | null;
 };
 
-export type VoicePlan = {
+export type VoicePlan<S extends VoiceState = VoiceState> = {
   say: string[];
-  nextState: VoiceState;
+  nextState: NextStateFor<S>;
   gather?: {
     input: Array<"speech" | "dtmf">;
     action: string;

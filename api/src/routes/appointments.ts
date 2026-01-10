@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import prisma from '../prisma';
 import requireAuth from '../middleware/auth';
+import { emitEvent } from '../lib/events';
+import { validationFail } from '../lib/validationFail';
 
 const router = Router();
 
@@ -68,6 +70,7 @@ try {
     isNaN(start.getTime()) ||
     isNaN(end.getTime())
   ) {
+    validationFail({ scope: "appointments", reason: "invalid_payload" });
     throw new Error('Invalid appointment data');
   }
 
@@ -83,6 +86,7 @@ try {
 });
 
 if (conflict) {
+  emitEvent("appointment_create_result", { ok: false });
   return res.status(409).json({ error: 'Time conflict' });
 }
 
@@ -95,11 +99,13 @@ if (conflict) {
     },
   });
 
+    emitEvent("appointment_create_result", { ok: true });
     return res.status(201).json({
       ...appointment,
       doctorId: Number(appointment.doctorId),
     });
   } catch (err) {
+    emitEvent("appointment_create_result", { ok: false });
     console.error('APPOINTMENT ERROR:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }

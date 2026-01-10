@@ -2,24 +2,18 @@ import { classifyIntent } from "./voiceIntents";
 import { VOICE_LINES } from "./voiceLines";
 import { pickLine } from "./pickLine";
 import { humanizeLine } from "./humanize";
+import { emitEvent } from "../lib/events";
+import { validationFail } from "../lib/validationFail";
 import type { VoiceContext, VoicePlan, VoiceState } from "./types";
+import { VOICE_TRANSITIONS } from "./types";
 
 const LOW_CONFIDENCE_THRESHOLD = 0.4;
 
-const ALLOWED_TRANSITIONS: Record<VoiceState, VoiceState[]> = {
-  inbound: ["intent"],
-  intent: ["name", "inbound", "complete"],
-  name: ["phone"],
-  phone: ["time", "name"],
-  time: ["complete", "inbound"],
-  complete: [],
-};
-
 function ensureTransition(from: VoiceState, to: VoiceState) {
-  // Guard against accidental fallthrough between steps in the flow kernel.
-  if (!ALLOWED_TRANSITIONS[from].includes(to)) {
+  if (!(VOICE_TRANSITIONS[from] as readonly VoiceState[]).includes(to)) {
     throw new Error(`Invalid voice state transition: ${from} -> ${to}`);
   }
+  emitEvent("voice_state_transition", { from, to });
 }
 
 function addLowConfidenceLine(lines: string[], confidence: number) {
@@ -34,7 +28,7 @@ function addMedicalBoundaryLine(lines: string[], medicalFlag: boolean) {
   }
 }
 
-export function buildInboundPlan(): VoicePlan {
+export function buildInboundPlan(): VoicePlan<"inbound"> {
   const line = `${pickLine(VOICE_LINES.greeting)} ${pickLine(
     VOICE_LINES.intentPrompt
   )}`;
@@ -54,7 +48,7 @@ export function buildInboundPlan(): VoicePlan {
 
 export function buildIntentPlan(speech: string): {
   context: VoiceContext;
-  plan: VoicePlan;
+  plan: VoicePlan<"intent">;
 } {
   const context: VoiceContext = {
     state: "intent",
@@ -66,6 +60,7 @@ export function buildIntentPlan(speech: string): {
   const trimmed = speech.trim();
   // Guard empty speech to avoid unintended intent resolution.
   if (!trimmed) {
+    validationFail({ scope: "voice", reason: "missing_speech", state: "intent" });
     ensureTransition("intent", "inbound");
     return {
       context,
@@ -127,7 +122,7 @@ export function buildIntentPlan(speech: string): {
   }
 }
 
-export function buildNamePlan(): VoicePlan {
+export function buildNamePlan(): VoicePlan<"name"> {
   ensureTransition("name", "phone");
   return {
     say: [pickLine(VOICE_LINES.reassurance)],
@@ -147,7 +142,7 @@ export function sanitizeName(rawName: string): string {
 
 export function buildPhonePlan(rawName: string): {
   context: VoiceContext;
-  plan: VoicePlan;
+  plan: VoicePlan<"phone">;
   name?: string;
 } {
   const name = sanitizeName(rawName);
@@ -155,6 +150,7 @@ export function buildPhonePlan(rawName: string): {
 
   // Guard missing name to keep callers in the explicit name capture step.
   if (!name) {
+    validationFail({ scope: "voice", reason: "missing_name", state: "phone" });
     ensureTransition("phone", "name");
     return {
       context,
@@ -194,7 +190,7 @@ export function buildTimePlan(params: {
 }): {
   ok?: true;
   context: VoiceContext;
-  plan?: VoicePlan;
+  plan?: VoicePlan<"time">;
 } {
   const context: VoiceContext = {
     state: "time",
@@ -205,6 +201,11 @@ export function buildTimePlan(params: {
 
   // Guard incomplete capture so we do not persist partial callback data.
   if (!params.name || !params.phone) {
+    validationFail({
+      scope: "voice",
+      reason: "missing_name_or_phone",
+      state: "time",
+    });
     ensureTransition("time", "inbound");
     return {
       context,

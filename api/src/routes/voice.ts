@@ -13,6 +13,7 @@ import {
 import type { VoicePlan } from "../voice/types";
 import { VOICE_LINES } from "../voice/voiceLines";
 import { pickLine } from "../voice/pickLine";
+import { emitEvent } from "../lib/events";
 
 const router = Router();
 const VoiceResponse = twilio.twiml.VoiceResponse;
@@ -113,6 +114,7 @@ router.post("/voice/time", async (req, res) => {
 
 
   try {
+    emitEvent("callback_create_attempt", { source: "voice" });
     await prisma.callbackRequest.create({
       data: {
         name,
@@ -122,10 +124,12 @@ router.post("/voice/time", async (req, res) => {
       },
     });
 
+    emitEvent("callback_create_result", { source: "voice", ok: true });
     twiml.say(VOICE, pickLine(VOICE_LINES.schedulingConfirm));
     twiml.say(VOICE, pickLine(VOICE_LINES.staffHandoff));
     twiml.hangup();
   } catch (err) {
+    emitEvent("callback_create_result", { source: "voice", ok: false });
     console.error("[voice callback error]", err);
     twiml.say(VOICE, pickLine(VOICE_LINES.retry));
     twiml.hangup();

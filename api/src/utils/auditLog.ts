@@ -1,3 +1,5 @@
+import type { Intent } from "../voice/voiceIntents";
+
 type PendingVoiceCallback = {
   intent: Intent;
   confidence: number;

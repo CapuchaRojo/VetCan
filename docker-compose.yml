@@ -29,6 +29,7 @@ services:
     env_file: .env
     ports:
       - "5173:5173"
+    command: npm run dev -- --host
     volumes:
       - ./web:/usr/src/web
     depends_on:

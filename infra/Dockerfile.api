@@ -3,20 +3,25 @@ FROM node:20-bookworm
 # 🔑 Work inside /usr/src/app/api
 WORKDIR /usr/src/app/api
 
-# Install dependencies
+# 1️⃣ Copy package files first
 COPY api/package*.json ./
+
+# 2️⃣ Copy prisma schema BEFORE npm ci (critical)
+COPY api/prisma ./prisma
+
+# 3️⃣ Install dependencies (postinstall can now run safely)
 RUN npm ci
 
-# Copy source code
+# 4️⃣ Copy the rest of the source code
 COPY api .
 
-# Clean any stale output
+# 5️⃣ Clean any stale output
 RUN rm -rf dist
 
-# Generate Prisma client
+# 6️⃣ Generate Prisma client (explicit, deterministic)
 RUN npx prisma generate
 
-# Compile using *this* tsconfig.json
+# 7️⃣ Compile using *this* tsconfig.json
 RUN npx tsc
 
 ENV NODE_ENV=production

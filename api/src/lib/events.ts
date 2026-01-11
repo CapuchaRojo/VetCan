@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { getCorrelationId } from "./requestContext";
 
 export type EventName =
   | "voice_state_transition"
@@ -18,13 +19,24 @@ export type EventPayloads = {
 };
 
 const emitter = new EventEmitter();
+const eventCounts: Partial<Record<EventName, number>> = {};
   emitter.setMaxListeners(50);
 
 export function emitEvent<E extends EventName>(
   name: E,
   payload: EventPayloads[E]
 ) {
-  emitter.emit(name, payload);
+  eventCounts[name] = (eventCounts[name] || 0) + 1;
+  const correlationId = getCorrelationId();
+  const finalPayload =
+    correlationId &&
+    typeof payload === "object" &&
+    payload !== null &&
+    !("correlationId" in payload)
+      ? { ...payload, correlationId }
+      : payload;
+
+  emitter.emit(name, finalPayload);
 }
 
 export function onEvent<E extends EventName>(
@@ -32,4 +44,9 @@ export function onEvent<E extends EventName>(
   listener: (payload: EventPayloads[E]) => void
 ) {
   emitter.on(name, listener);
+}
+
+// In-memory counters for observability; reset on process restart.
+export function getEventCounts() {
+  return { ...eventCounts };
 }

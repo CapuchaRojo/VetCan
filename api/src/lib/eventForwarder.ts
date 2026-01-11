@@ -38,10 +38,20 @@ export function initEventForwarder() {
   const path = `${target.pathname}${target.search}`;
 
   const postEvent = (eventName: EventName, payload: unknown) => {
+    const correlationId =
+      typeof payload === "object" &&
+      payload !== null &&
+      "correlationId" in payload
+        ? (payload as { correlationId?: string }).correlationId
+        : undefined;
+
     const body = JSON.stringify({
       eventName,
+      eventVersion: 1,
       payload,
       timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || "local",
+      correlationId,
     });
 
     const req = httpClient.request(

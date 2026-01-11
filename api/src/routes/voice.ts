@@ -14,6 +14,12 @@ import type { VoicePlan } from "../voice/types";
 import { VOICE_LINES } from "../voice/voiceLines";
 import { pickLine } from "../voice/pickLine";
 import { emitEvent } from "../lib/events";
+import {
+  createCorrelationId,
+  getCorrelationIdForCall,
+  runWithCorrelationId,
+  setCorrelationIdForCall,
+} from "../lib/requestContext";
 
 const router = Router();
 const VoiceResponse = twilio.twiml.VoiceResponse;
@@ -25,6 +31,22 @@ const VOICE = {
   voice: "alice" as const,
   rate: "90%",
 };
+
+router.use((req, _res, next) => {
+  const callSid = String(req.body?.CallSid || req.query?.CallSid || "").trim();
+  if (!callSid) {
+    return next();
+  }
+
+  let correlationId = getCorrelationIdForCall(callSid);
+  if (!correlationId) {
+    // Generate once at call entry to keep a stable trace ID.
+    correlationId = createCorrelationId();
+    setCorrelationIdForCall(callSid, correlationId);
+  }
+
+  return runWithCorrelationId(correlationId, next);
+});
 
 function applyPlan(twiml: twilio.twiml.VoiceResponse, plan: VoicePlan) {
   const sayTarget = plan.gather

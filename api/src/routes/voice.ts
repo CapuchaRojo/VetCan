@@ -151,6 +151,7 @@ router.post("/voice/time", async (req, res) => {
     twiml.say(VOICE, pickLine(VOICE_LINES.staffHandoff));
     twiml.hangup();
   } catch (err) {
+    emitEvent("callback_create_failed", { source: "voice" });
     emitEvent("callback_create_result", { source: "voice", ok: false });
     console.error("[voice callback error]", err);
     twiml.say(VOICE, pickLine(VOICE_LINES.retry));

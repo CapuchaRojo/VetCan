@@ -1,6 +1,7 @@
 // api/src/server.ts
 import app from './app';
 import { initEventForwarder } from './lib/eventForwarder';
+import { initAlertEvaluator } from './lib/alerts';
 
 function validateRequiredEnv() {
   if (process.env.NODE_ENV === 'test') return;
@@ -26,6 +27,7 @@ function validateRequiredEnv() {
 
 validateRequiredEnv();
 initEventForwarder();
+initAlertEvaluator();
 
 const PORT = process.env.PORT || 4000;
 

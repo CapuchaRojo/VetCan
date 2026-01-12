@@ -9,8 +9,10 @@ const EVENT_NAMES: EventName[] = [
   "validation_failed",
   "callback_create_attempt",
   "callback_create_result",
+  "callback_create_failed",
   "ai_call_initiated",
   "appointment_create_result",
+  "alert_triggered",
 ];
 
 export function initEventForwarder() {

@@ -6,16 +6,26 @@ export type EventName =
   | "validation_failed"
   | "callback_create_attempt"
   | "callback_create_result"
+  | "callback_create_failed"
   | "ai_call_initiated"
-  | "appointment_create_result";
+  | "appointment_create_result"
+  | "alert_triggered";
 
 export type EventPayloads = {
   voice_state_transition: { from: string; to: string };
   validation_failed: { scope: "voice" | "appointments"; reason: string; state?: string };
   callback_create_attempt: { source: "voice" };
   callback_create_result: { source: "voice"; ok: boolean };
+  callback_create_failed: { source: "voice" };
   ai_call_initiated: { mode: "twilio" };
   appointment_create_result: { ok: boolean };
+  alert_triggered: {
+    alertType: string;
+    eventName: string;
+    count: number;
+    threshold: number;
+    windowSeconds: number;
+  };
 };
 
 const emitter = new EventEmitter();

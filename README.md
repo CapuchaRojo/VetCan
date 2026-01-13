@@ -1,194 +1,186 @@
-# VetCan
+VetCan
 
-VetCan is a lightweight, clinic-style CRM and automation platform designed for **medical cannabis and adjacent regulated workflows** (callbacks, renewals, scheduling, and follow-ups).
+VetCan is a lightweight, clinic-style CRM and automation platform designed for regulated callback, renewal, scheduling, and follow-up workflows, including medical cannabis and adjacent industries.
 
 It focuses on one core outcome:
 
-> **Reduce missed callbacks and renewals without adding staff — safely, visibly, and compliantly.**
+Reduce missed callbacks and renewals without adding staff — safely, visibly, and compliantly.
 
----
+⚠️ Compliance & Scope Disclaimer
 
-## ⚠️ Compliance & Scope Disclaimer
+VetCan is HIPAA-aware but NOT a HIPAA compliance guarantee.
 
-VetCan is **HIPAA-aware** but **NOT a HIPAA compliance guarantee**.
+No Protected Health Information (PHI) is required for core workflows
 
-- No Protected Health Information (PHI) is required for core workflows
-- AI handling is restricted to **non-medical routing and triage**
-- Any production deployment involving patient data requires independent legal, security, and compliance review
+AI handling is restricted to non-medical routing and triage
 
-VetCan is designed to *avoid* PHI whenever possible.
+AI never provides medical advice
 
----
+Any production deployment involving patient data requires independent legal, security, and compliance review
 
-## ⚠️ Prisma / Cloud Execution Note (Important)
+VetCan is intentionally designed to avoid PHI whenever possible.
 
-This repository pins **Prisma v5.22.0**.
+⚠️ Prisma & Execution Environment Notes (Important)
 
-Some cloud execution environments (including Codex) force-install Prisma v7+, which is incompatible.
+This repository pins Prisma v5.22.0.
 
-✅ **Local development and GitHub Actions CI are the source of truth**  
-❌ **Do not rely on Codex execution results for this repository**
+Some execution environments (including certain AI sandboxes and restricted containers) force-install newer Prisma versions or restrict filesystem / socket access, which can cause false negatives.
 
----
+✅ Local development and GitHub Actions CI are the source of truth
+❌ Do not rely on restricted execution environments for validation
 
-## What You Can Demo in ~60 Seconds
+🧪 Testing & Environment Limitations (Important)
+API Integration Tests
+
+VetCan includes a comprehensive API test suite using Jest + Supertest.
+
+However, some sandboxed or restricted environments forbid socket operations entirely, resulting in EPERM errors when running API integration tests — even when production code is correct.
+
+In such environments:
+
+API tests cannot execute
+
+Production behavior is unaffected
+
+Dashboards, metrics, and live API endpoints continue to function correctly
+
+Official Testing Guidance
+
+✅ Run API tests in:
+
+GitHub Actions CI
+
+A permissive local environment
+
+A non-restricted Docker host
+
+❌ Do not treat EPERM failures in restricted environments as code defects
+
+This is a known and documented limitation, not a system instability.
+
+What You Can Demo in ~60 Seconds
 
 VetCan is built to demo cleanly and convincingly:
 
-- API health & uptime
-- Callback intake
-- AI-assisted callback handling
-- Automatic escalation when medical questions are detected
-- Real-time admin dashboard updates
+API health & uptime
 
----
+Callback intake
 
-## Demo, Simulation, and Real Execution Modes
+AI-assisted callback handling
 
-VetCan deliberately separates **presentation**, **testing**, and **production** behavior to prevent
-data contamination and ensure compliance.
+Automatic escalation when medical language is detected
 
----
-
-### 🟦 Demo Mode (Non-Persistent)
-**Purpose:** Sales demos, UI walkthroughs, investor presentations  
-**How:** `?demo=true` or `DEMO_MODE=true`
-
-- ❌ No database writes
-- ❌ No state mutations
-- ❌ No PHI risk
-- ✅ Returns realistic, synthetic responses
-- ✅ UI updates locally only
-
-> Demo mode is visually indistinguishable from real operation, but leaves **zero footprint**.
-
----
-
-### 🟨 Simulation Mode (Persistent, Test-Safe)
-**Purpose:** Automated tests, local development, CI verification  
-**How:** `NODE_ENV=test` or `AI_CALLBACK_SIMULATION=true`
-
-- ✅ Writes to database
-- ✅ Enforces compliance-safe summaries
-- ❌ Never stores medical details or PHI
-- ✅ Used by Jest test suite
-
-### Simulation mode proves guardrails work under real persistence.
-
----
-
-### 🟥 Real Execution Mode (Production)
-**Purpose:** Live clinic operations  
-**How:** Default behavior with integrations enabled
-
-- ✅ Twilio voice/SMS
-- ✅ Staff notifications
-- ✅ Auditable records
-- 🔒 Requires legal + security review for regulated environments
-
----
-
-### This separation is intentional and enforced by tests.
-
-
-### Live demo flow
-1. A callback request is created (API or UI)
-2. AI attempts to handle the callback
-3. If a medical question is detected:
-   - The callback is **escalated to staff**
-   - The AI stops immediately (compliance-safe)
-4. The admin dashboard updates in real time
+Real-time admin dashboard updates
 
 No page refresh required.
 
----
+Demo, Simulation, and Production Modes
 
-## Architecture (MVP)
+VetCan deliberately separates presentation, testing, and production behavior to prevent data contamination and ensure compliance.
 
-api/ Express + TypeScript API (Prisma + Postgres)
-web/ Admin dashboard (React + Vite)
-worker/ Background jobs / automation runner
-infra/ Dockerfiles and compose configs
-db Postgres 15
-redis Redis 7 (queues + lightweight caching)
+🟦 Demo Mode (Non-Persistent)
 
+Purpose: Sales demos, UI walkthroughs, investor presentations
+How: ?demo=true or DEMO_MODE=true
 
----
+❌ No database writes
 
-## Core Concepts
+❌ No state mutations
 
-### Callback Lifecycle
+❌ No PHI risk
+
+✅ Returns realistic, synthetic responses
+
+✅ UI updates locally only
+
+Demo mode is visually indistinguishable from real operation, but leaves zero footprint.
+
+🟨 Simulation Mode (Persistent, Test-Safe)
+
+Purpose: Local development, CI verification
+How: NODE_ENV=test or AI_CALLBACK_SIMULATION=true
+
+✅ Writes to database
+
+✅ Enforces compliance-safe summaries
+
+❌ Never stores medical details or PHI
+
+✅ Used by the Jest test suite
+
+Simulation mode proves guardrails under real persistence.
+
+🟥 Real Execution Mode (Production)
+
+Purpose: Live clinic operations
+
+✅ Twilio voice / SMS (provider-abstracted)
+
+✅ Staff notifications
+
+✅ Auditable records
+
+🔒 Requires legal + security review for regulated use
+
+Live Demo Flow
+
+A callback request is created (API or UI)
+
+AI attempts to handle the callback
+
+If medical language is detected:
+
+The callback is escalated to staff
+
+The AI stops immediately
+
+The admin dashboard updates in real time
+
+Once escalated, AI cannot re-enter the callback.
+
+Architecture (MVP)
+api/     Express + TypeScript API (Prisma + Postgres)
+web/     Admin dashboard (React + Vite)
+worker/  Background jobs / automation runner
+infra/   Dockerfiles & compose configs
+db/      Postgres 15
+redis/   Redis 7 (queues + lightweight caching)
+
+Core Concepts
+Callback Lifecycle
+
 Callbacks move through a strict, auditable lifecycle:
 
-- `pending`
-- `completed` (AI handled successfully)
-- `needs_staff` (medical question detected)
+pending
 
-Once a callback leaves `pending`, **it cannot be reprocessed**.
+completed (AI handled successfully)
 
-This prevents:
-- double-calling
-- AI re-entry
-- compliance drift
+needs_staff (medical language detected)
 
----
-
-### AI Safety Guardrails
-
-AI callbacks are intentionally constrained:
-
-- AI **never provides medical advice**
-- AI **immediately escalates** if medical language is detected
-- Escalation permanently halts AI handling for that callback
-
-This behavior is enforced at the API layer.
-
----
-
-## Quick Start (Local)
-
-### 1) Configure environment
-```bash
-cp .env.example .env
-
-
----
-
-## Core Concepts
-
-### Callback Lifecycle
-Callbacks move through a strict, auditable lifecycle:
-
-- `pending`
-- `completed` (AI handled successfully)
-- `needs_staff` (medical question detected)
-
-Once a callback leaves `pending`, **it cannot be reprocessed**.
+Once a callback leaves pending, it cannot be reprocessed.
 
 This prevents:
-- double-calling
-- AI re-entry
-- compliance drift
 
----
+double-calling
 
-### AI Safety Guardrails
+AI re-entry
 
-AI callbacks are intentionally constrained:
+compliance drift
 
-- AI **never provides medical advice**
-- AI **immediately escalates** if medical language is detected
-- Escalation permanently halts AI handling for that callback
+AI Safety Guardrails
 
-This behavior is enforced at the API layer.
+AI never provides medical advice
 
----
+AI immediately escalates on medical language
 
-## Quick Start (Local)
+Escalation permanently halts AI handling
 
-### 1) Configure environment
-```bash
+These guardrails are enforced at the API layer, not the UI.
+
+Quick Start (Local)
+1) Configure environment
 cp .env.example .env
+
 
 Fill in required values (DB credentials, ports, etc).
 
@@ -220,22 +212,7 @@ GET	/health	API health + uptime
 GET	/api/callbacks	List callbacks
 POST	/api/callbacks	Create callback
 POST	/api/callbacks/:id/ai-call	Trigger AI handling (simulation supported)
-Demo Mode (Non-Persistent)
-
-VetCan supports demo-safe execution to prevent database pollution during demos.
-
-When enabled, demo actions:
-
-do not persist records
-
-do not alter production-like data
-
-still fully exercise AI and UI behavior
-
-Demo mode is intended for sales, validation, and investor walkthroughs.
-
-(Implementation documented in upcoming section.)
-
+GET	/api/internal/metrics	Internal metrics & alerts
 Milestones
 v0.1 — Stable Baseline ✅
 
@@ -257,43 +234,15 @@ Medical escalation
 
 Real-time UI updates
 
-v0.3 — SMS / Voice Integration (Planned)
+v0.3 — Voice & SMS Integration (Planned)
 
 Twilio provider
 
-Inbound/outbound call hooks
+Inbound/outbound hooks
 
 Message templates & logs
 
-Twilio is abstracted behind a provider interface so alternatives can be added later.
-
-Testing & CI
-
-API tests:
-
-cd api
-npm test
-
-
-CI runs:
-
-API tests
-
-Web build checks
-
-Blocks failing commits
-
-Production Hardening (Future)
-
-Authentication & RBAC
-
-Audit trails
-
-Encrypted secrets
-
-Retention policies
-
-Monitoring & alerting
+Providers are abstracted to allow alternatives.
 
 License
 
@@ -303,4 +252,4 @@ Contact / Ownership
 
 VetCan is being built as a milestone-driven MVP for real-world operators.
 
-If you’re evaluating it for a clinic or dispensary workflow, the best next step is a live demo of the callback → AI → escalation loop.
+If you’re evaluating it for a regulated clinic or renewal workflow, the best next step is a live demo of the callback → AI → escalation loop.

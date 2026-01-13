@@ -26,7 +26,7 @@ export default function Dashboard() {
   const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [demoIds, setDemoIds] = useState<Set<string>>(new Set());
-  
+
   useEffect(() => {
     const fetchCallbacks = async () => {
       try {
@@ -81,11 +81,11 @@ export default function Dashboard() {
       }
     });
 
-    async function attemptAiCallback(id: string) {
-      try {
-        setLoadingId(id);
+  async function attemptAiCallback(id: string) {
+    try {
+      setLoadingId(id);
 
-        const res = await fetch(
+      const res = await fetch(
         `/api/callbacks/${id}/ai-call?demo=true`,
         {
           method: "POST",
@@ -233,7 +233,7 @@ export default function Dashboard() {
                       DEMO
                     </span>
                   )}
-                  </td>
+                </td>
                 <td>
                   {cb.aiHandled ? (
                     <span className="inline-flex items-center gap-1 animate-pulse">

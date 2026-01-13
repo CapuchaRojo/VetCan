@@ -114,6 +114,8 @@ export function initAlertEvaluator() {
             count: alert.count,
             threshold: alert.threshold,
             windowSeconds: alert.windowSeconds,
+            environment: process.env.NODE_ENV || "local",
+            triggeredAt: alert.firstTriggeredAt,
           });
         } else {
           const existing = activeAlerts.get(key)!;

@@ -25,6 +25,8 @@ export type EventPayloads = {
     count: number;
     threshold: number;
     windowSeconds: number;
+    environment: string;
+    triggeredAt: string;
   };
 };
 

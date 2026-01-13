@@ -8,12 +8,13 @@ import {
   buildPhonePlan,
   buildTimePlan,
   normalizePhone,
-  sanitizeName,
+  validateNameInput,
 } from "../voice/voiceFlow";
 import type { VoicePlan } from "../voice/types";
 import { VOICE_LINES } from "../voice/voiceLines";
 import { pickLine } from "../voice/pickLine";
 import { emitEvent } from "../lib/events";
+import { validationFail } from "../lib/validationFail";
 import {
   createCorrelationId,
   getCorrelationIdForCall,
@@ -35,6 +36,11 @@ const VOICE = {
 router.use((req, _res, next) => {
   const callSid = String(req.body?.CallSid || req.query?.CallSid || "").trim();
   if (!callSid) {
+    return next();
+  }
+
+  if (!callSid.startsWith("CA") || callSid.length > 64) {
+    validationFail({ scope: "voice", reason: "invalid_call_sid", state: "inbound" });
     return next();
   }
 
@@ -118,14 +124,26 @@ router.post("/voice/phone", (req, res) => {
 router.post("/voice/time", async (req, res) => {
   const twiml = new VoiceResponse();
 
-  const rawName = String(req.query.name || "").trim();
-  const name = sanitizeName(rawName);
+  const rawName = req.query.name;
+  const { name, reason } = validateNameInput(rawName);
   const rawPhone = req.body.SpeechResult || req.body.Digits || "";
   const preferredTime = String(req.body.SpeechResult || "").trim() || null;
 
   const phone = normalizePhone(rawPhone);
 
-  const result = buildTimePlan({ name, phone, preferredTime });
+  if (!name && reason) {
+    validationFail({ scope: "voice", reason, state: "time" });
+  }
+  if (!phone) {
+    validationFail({ scope: "voice", reason: "missing_phone", state: "time" });
+  }
+
+  const result = buildTimePlan({
+    name,
+    phone,
+    preferredTime,
+    skipValidation: !!reason || !phone,
+  });
 
   if (!result.ok && result.plan) {
     applyPlan(twiml, result.plan);

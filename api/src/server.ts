@@ -15,14 +15,20 @@ function validateRequiredEnv() {
   ];
 
   const missing = required.filter((key) => !process.env[key]);
-  if (missing.length === 0) return;
-
-  const message = `[config] Missing required env vars: ${missing.join(', ')}`;
-  if (process.env.NODE_ENV === 'production') {
-    console.error(message);
-  } else {
-    console.warn(message);
+  const invalid: string[] = [];
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  if (accountSid && !accountSid.startsWith('AC')) {
+    invalid.push('TWILIO_ACCOUNT_SID');
   }
+
+  if (missing.length === 0 && invalid.length === 0) return;
+
+  const details = [
+    missing.length ? `missing: ${missing.join(', ')}` : null,
+    invalid.length ? `invalid: ${invalid.join(', ')}` : null,
+  ].filter(Boolean).join(' | ');
+
+  throw new Error(`[config] ${details}`);
 }
 
 validateRequiredEnv();

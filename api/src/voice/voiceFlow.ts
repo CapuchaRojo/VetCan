@@ -136,21 +136,46 @@ export function buildNamePlan(): VoicePlan<"name"> {
   };
 }
 
-export function sanitizeName(rawName: string): string {
-  return rawName.trim().slice(0, 100).replace(/[<>\"\'%;()&]/g, "");
+export function validateNameInput(rawName: unknown): {
+  name: string;
+  reason?: string;
+} {
+  if (typeof rawName !== "string") {
+    return { name: "", reason: "invalid_name" };
+  }
+
+  const trimmed = rawName.trim();
+  if (!trimmed) {
+    return { name: "", reason: "missing_name" };
+  }
+
+  if (trimmed.length > 50) {
+    return { name: "", reason: "name_too_long" };
+  }
+
+  const sanitized = trimmed.replace(/[<>\"\'%;()&]/g, "");
+  if (!sanitized) {
+    return { name: "", reason: "invalid_name" };
+  }
+
+  return { name: sanitized, reason: undefined };
 }
 
-export function buildPhonePlan(rawName: string): {
+export function buildPhonePlan(rawName: unknown): {
   context: VoiceContext;
   plan: VoicePlan<"phone">;
   name?: string;
 } {
-  const name = sanitizeName(rawName);
+  const { name, reason } = validateNameInput(rawName);
   const context: VoiceContext = { state: "phone", name };
 
   // Guard missing name to keep callers in the explicit name capture step.
   if (!name) {
-    validationFail({ scope: "voice", reason: "missing_name", state: "phone" });
+    validationFail({
+      scope: "voice",
+      reason: reason || "missing_name",
+      state: "phone",
+    });
     ensureTransition("phone", "name");
     return {
       context,
@@ -187,6 +212,7 @@ export function buildTimePlan(params: {
   name: string;
   phone: string;
   preferredTime: string | null;
+  skipValidation?: boolean;
 }): {
   ok?: true;
   context: VoiceContext;
@@ -201,11 +227,13 @@ export function buildTimePlan(params: {
 
   // Guard incomplete capture so we do not persist partial callback data.
   if (!params.name || !params.phone) {
-    validationFail({
-      scope: "voice",
-      reason: "missing_name_or_phone",
-      state: "time",
-    });
+    if (!params.skipValidation) {
+      validationFail({
+        scope: "voice",
+        reason: "missing_name_or_phone",
+        state: "time",
+      });
+    }
     ensureTransition("time", "inbound");
     return {
       context,

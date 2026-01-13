@@ -1,14 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-// Validate JWT secret at startup - fail fast in production
 const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  if (process.env.NODE_ENV === 'production') {
-    console.error('❌ FATAL: JWT_SECRET must be set in production');
-    process.exit(1);
-  }
-  console.warn('⚠️  Using fallback JWT secret. Set JWT_SECRET in production.');
+const EFFECTIVE_JWT_SECRET =
+  JWT_SECRET || (process.env.NODE_ENV === "test" ? "test-secret" : undefined);
+
+if (!EFFECTIVE_JWT_SECRET && process.env.NODE_ENV !== "test") {
+  throw new Error("JWT_SECRET must be set");
 }
 
 /**
@@ -39,7 +37,7 @@ export default function requireAuth(
     // Verify the JWT token
     const decoded = jwt.verify(
       token,
-      JWT_SECRET || 'test-secret'
+      EFFECTIVE_JWT_SECRET as string
     );
 
     // Attach user info to request for downstream use
@@ -66,7 +64,7 @@ export function optionalAuth(
     try {
       const decoded = jwt.verify(
         token,
-        JWT_SECRET || 'test-secret'
+        EFFECTIVE_JWT_SECRET as string
       );
       (req as any).user = decoded;
     } catch (error) {

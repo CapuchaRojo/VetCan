@@ -1,5 +1,8 @@
 import { emitEvent, getEventCounts } from "./events";
 
+/**
+ * Alert state tracked in-memory
+ */
 type AlertState = {
   alertType: string;
   eventName: string;
@@ -9,12 +12,18 @@ type AlertState = {
   firstTriggeredAt: string;
 };
 
+/**
+ * Threshold rule definition
+ */
 type ThresholdRule = {
   envKey: string;
   eventName: string;
   alertType: string;
 };
 
+/**
+ * Configurable alert rules
+ */
 const RULES: ThresholdRule[] = [
   {
     envKey: "ALERT_VALIDATION_FAILED_THRESHOLD",
@@ -28,9 +37,17 @@ const RULES: ThresholdRule[] = [
   },
 ];
 
+/**
+ * Active alerts (currently triggered)
+ */
 const activeAlerts = new Map<string, AlertState>();
-let initialized = false;
 
+let initialized = false;
+let lastCounts: Record<string, number> | null = null;
+
+/**
+ * Helpers
+ */
 function parseThreshold(value: string | undefined) {
   if (!value) return null;
   const parsed = Number(value);
@@ -55,8 +72,9 @@ function getWindowCount(
   return Math.max(0, nowCount - prevCount);
 }
 
-let lastCounts: Record<string, number> | null = null;
-
+/**
+ * Initialize the alert evaluation loop
+ */
 export function initAlertEvaluator() {
   if (initialized) return;
   initialized = true;
@@ -64,6 +82,7 @@ export function initAlertEvaluator() {
   const windowSeconds = parseWindowSeconds(
     process.env.ALERT_WINDOW_SECONDS
   );
+
   const thresholds = RULES.map((rule) => {
     const threshold = parseThreshold(process.env[rule.envKey]);
     return threshold
@@ -71,9 +90,7 @@ export function initAlertEvaluator() {
       : null;
   }).filter(Boolean) as Array<ThresholdRule & { threshold: number }>;
 
-  if (thresholds.length === 0) {
-    return;
-  }
+  if (thresholds.length === 0) return;
 
   if (!windowSeconds) {
     console.warn("[alerts] Invalid ALERT_WINDOW_SECONDS; alerts disabled.");
@@ -82,6 +99,7 @@ export function initAlertEvaluator() {
 
   const evaluate = () => {
     let counts: Record<string, number> = {};
+
     try {
       counts = getEventCounts();
     } catch {
@@ -107,7 +125,10 @@ export function initAlertEvaluator() {
             windowSeconds,
             firstTriggeredAt: new Date().toISOString(),
           };
+
           activeAlerts.set(key, alert);
+
+          // 🔔 Single, canonical alert event
           emitEvent("alert_triggered", {
             alertType: alert.alertType,
             eventName: alert.eventName,
@@ -118,8 +139,7 @@ export function initAlertEvaluator() {
             triggeredAt: alert.firstTriggeredAt,
           });
         } else {
-          const existing = activeAlerts.get(key)!;
-          existing.count = count;
+          activeAlerts.get(key)!.count = count;
         }
       } else {
         activeAlerts.delete(key);
@@ -132,6 +152,9 @@ export function initAlertEvaluator() {
   setInterval(evaluate, windowSeconds * 1000);
 }
 
+/**
+ * Expose active alerts for metrics/dashboard
+ */
 export function getActiveAlerts(): AlertState[] {
   return Array.from(activeAlerts.values());
 }

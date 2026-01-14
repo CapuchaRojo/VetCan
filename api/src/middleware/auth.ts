@@ -7,7 +7,6 @@ const IS_PROD = RAW_NODE_ENV === "production";
 const IS_TEST = RAW_NODE_ENV === "test";
 const IS_DEV = !IS_PROD && !IS_TEST;
 
-// ✅ ADD THIS LINE (this is what’s missing)
 const ALLOW_DEV_AUTH_BYPASS =
   process.env.ALLOW_DEV_AUTH_BYPASS === "true";
 
@@ -17,22 +16,17 @@ function resolveJwtSecret(): string | null {
   return null;
 }
 
+/**
+ * Strict authentication middleware
+ */
 export default function requireAuth(
   req: Request,
   res: Response,
   next: NextFunction
 ) {
-  // ✅ Explicit dev/test bypass (opt-in only)
-if (!IS_PROD && ALLOW_DEV_AUTH_BYPASS) {
-  if (IS_DEV) {
-    return next();
-  }
-  if (IS_TEST && req.headers["x-test-skip-auth"] === "true") {
-    return next();
-  }
-}
-
-  // ✅ Test-only explicit bypass (used by Jest)
+  /**
+   * 🧪 Test-only bypass (always allowed for Jest)
+   */
   if (
     IS_TEST &&
     req.headers["x-test-skip-auth"] === "true"
@@ -40,6 +34,16 @@ if (!IS_PROD && ALLOW_DEV_AUTH_BYPASS) {
     return next();
   }
 
+  /**
+   * 🧪 Dev-only bypass (explicit opt-in)
+   */
+  if (IS_DEV && ALLOW_DEV_AUTH_BYPASS) {
+    return next();
+  }
+
+  /**
+   * 🔒 Hard auth enforcement below
+   */
   const secret = resolveJwtSecret();
   if (!secret) {
     console.error("[auth] JWT_SECRET missing");
@@ -59,12 +63,39 @@ if (!IS_PROD && ALLOW_DEV_AUTH_BYPASS) {
   try {
     const decoded = jwt.verify(token, secret);
     (req as any).user = decoded;
+
+    const operatorId =
+      typeof decoded === "object" && decoded !== null && "sub" in decoded
+        ? String((decoded as any).sub)
+        : undefined;
+
+    const operatorRole =
+      typeof decoded === "object" && decoded !== null && "role" in decoded
+        ? String((decoded as any).role)
+        : undefined;
+
+    const operatorName =
+      typeof decoded === "object" && decoded !== null && "name" in decoded
+        ? String((decoded as any).name)
+        : undefined;
+
+    (req as any).operator = {
+      id: operatorId,
+      role: operatorRole,
+      name: operatorName ?? "Unknown Operator",
+    };
+
     return next();
   } catch {
     return res.status(401).json({ error: "Invalid token" });
   }
 }
 
+/**
+ * Optional authentication
+ * - Never blocks request
+ * - Attaches user if token is valid
+ */
 export function optionalAuth(
   req: Request,
   _res: Response,
@@ -87,6 +118,9 @@ export function optionalAuth(
   next();
 }
 
+/**
+ * Role-based authorization
+ */
 export function requireRole(...allowedRoles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     const user = (req as any).user;

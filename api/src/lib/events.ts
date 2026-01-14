@@ -50,12 +50,18 @@ export type EventPayloads = {
     environment: string;
     acknowledgedAt: string;
     correlationId?: string;
+    operatorId?: string;
+    operatorName?: string;
+    role?: string;
   };
   callback_marked_staff_handled: {
     callbackId: string;
     environment: string;
     handledAt: string;
     correlationId?: string;
+    operatorId?: string;
+    operatorName?: string;
+    role?: string;
   };
 };
 
@@ -68,6 +74,9 @@ const recentEvents: Array<{
   timestamp: string;
   correlationId?: string;
   environment: string;
+  operatorId?: string;
+  operatorName?: string;
+  role?: string;
 }> = [];
 
 const MAX_RECENT_EVENTS = 200;
@@ -89,6 +98,25 @@ export function emitEvent<E extends EventName>(
   const resolvedCorrelationId =
     contextCorrelationId || payloadCorrelationId;
 
+  const operatorId =
+    typeof payload === "object" &&
+    payload !== null &&
+    "operatorId" in payload
+      ? (payload as { operatorId?: string }).operatorId
+      : undefined;
+  const operatorName =
+    typeof payload === "object" &&
+    payload !== null &&
+    "operatorName" in payload
+      ? (payload as { operatorName?: string }).operatorName
+      : undefined;
+  const operatorRole =
+    typeof payload === "object" &&
+    payload !== null &&
+    "role" in payload
+      ? (payload as { role?: string }).role
+      : undefined;
+
   let finalPayload = payload as any;
   if (
     resolvedCorrelationId &&
@@ -104,6 +132,9 @@ export function emitEvent<E extends EventName>(
     timestamp: new Date().toISOString(),
     correlationId: resolvedCorrelationId,
     environment: process.env.NODE_ENV || "local",
+    operatorId,
+    operatorName,
+    role: operatorRole,
   });
 
   if (recentEvents.length > MAX_RECENT_EVENTS) {

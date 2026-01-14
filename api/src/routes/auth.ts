@@ -14,7 +14,7 @@ router.post("/dev-token", (_req, res) => {
   }
 
   const token = jwt.sign(
-    { sub: "dev-operator", role: "admin" },
+    { sub: "dev-operator", role: "admin", name: "Dev Operator" },
     secret,
     { expiresIn: "1h" }
   );

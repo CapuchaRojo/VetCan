@@ -44,6 +44,8 @@ router.post("/alerts/:id/acknowledge", requireRole("admin"), (req, res) => {
     return res.status(404).json({ error: "Alert not found" });
   }
 
+  const operator = (req as any).operator;
+
   emitEvent("alert_acknowledged", {
     alertId: alert.id,
     alertType: alert.alertType,
@@ -51,6 +53,9 @@ router.post("/alerts/:id/acknowledge", requireRole("admin"), (req, res) => {
     environment: alert.environment,
     acknowledgedAt: alert.acknowledgedAt as string,
     correlationId: alert.correlationId,
+    operatorId: operator?.id,
+    operatorName: operator?.name,
+    role: operator?.role,
   });
 
   return res.json({ ok: true });
@@ -71,10 +76,15 @@ router.post(
         },
       });
 
+      const operator = (req as any).operator;
+
       emitEvent("callback_marked_staff_handled", {
         callbackId: updated.id,
         environment: process.env.NODE_ENV || "local",
         handledAt: new Date().toISOString(),
+        operatorId: operator?.id,
+        operatorName: operator?.name,
+        role: operator?.role,
       });
 
       return res.json({ ok: true });

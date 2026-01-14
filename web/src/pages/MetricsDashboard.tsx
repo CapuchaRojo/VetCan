@@ -30,6 +30,9 @@ type RecentEvent = {
   timestamp: string;
   correlationId?: string;
   environment: string;
+  operatorId?: string;
+  operatorName?: string;
+  role?: string;
 };
 
 export default function MetricsDashboard() {
@@ -471,7 +474,14 @@ export default function MetricsDashboard() {
                   {auditEvents.map((event, idx) => (
                     <tr key={`${event.eventName}-${event.timestamp}-${idx}`}>
                       <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
-                        {event.eventName}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                          <span>{event.eventName}</span>
+                          <span style={{ fontSize: "12px", color: "#7b726a" }}>
+                            {event.operatorName
+                              ? `by ${event.operatorName}${event.role ? ` (${event.role})` : ""}`
+                              : "Operator unknown"}
+                          </span>
+                        </div>
                       </td>
                       <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
                         {new Date(event.timestamp).toLocaleString()}

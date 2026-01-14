@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 
 type FilterMode = "all" | "pending" | "ai" | "staff";
 
@@ -27,6 +28,7 @@ type ActiveAlert = {
 };
 
 export default function Dashboard() {
+  const location = useLocation();
   const [callbacks, setCallbacks] = useState<Callback[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
@@ -111,6 +113,8 @@ export default function Dashboard() {
       }
     });
 
+  const activeAlertCount = alerts.filter(alert => !alert.acknowledgedAt).length;
+
   async function attemptAiCallback(id: string) {
     try {
       setLoadingId(id);
@@ -186,6 +190,29 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      <nav className="flex items-center gap-4 mb-6 text-sm">
+        <Link
+          to="/"
+          className={`px-3 py-1 rounded ${
+            location.pathname === "/" ? "bg-gray-900 text-white" : "text-gray-600 hover:text-gray-900"
+          }`}
+        >
+          Dashboard
+        </Link>
+        <Link
+          to="/metrics"
+          className={`px-3 py-1 rounded ${
+            location.pathname === "/metrics" ? "bg-gray-900 text-white" : "text-gray-600 hover:text-gray-900"
+          }`}
+        >
+          Metrics
+          {activeAlertCount > 0 && (
+            <span className="ml-2 inline-flex items-center justify-center text-xs bg-red-600 text-white rounded-full px-2">
+              {activeAlertCount}
+            </span>
+          )}
+        </Link>
+      </nav>
       <h1 className="text-2xl font-semibold mb-1">VetCan Admin Dashboard</h1>
 
       {toast && (
@@ -204,12 +231,12 @@ export default function Dashboard() {
 
       {/* Active Alerts */}
       <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-2">Active Alerts</h2>
+        <h2 className="text-lg font-semibold mb-2">Active Alerts Overview</h2>
         {alertsError && (
           <p className="text-sm text-red-600 mb-2">{alertsError}</p>
         )}
         {alerts.length === 0 ? (
-          <p className="text-sm text-gray-500">No active alerts.</p>
+          <p className="text-sm text-gray-500">No active alerts. System is stable.</p>
         ) : (
           <div className="overflow-auto border rounded">
             <table className="min-w-full text-sm">
@@ -239,17 +266,17 @@ export default function Dashboard() {
                     <td className="p-2">
                       {alert.acknowledgedAt
                         ? new Date(alert.acknowledgedAt).toLocaleString()
-                        : "—"}
+                        : "Not acknowledged"}
                     </td>
                     <td className="p-2">
                       {alert.acknowledgedAt ? (
-                        "—"
+                        "Acknowledged"
                       ) : (
                         <button
                           onClick={() => acknowledgeAlert(alert.id)}
                           className="px-2 py-1 border rounded text-xs"
                         >
-                          Acknowledge
+                          Acknowledge Alert
                         </button>
                       )}
                     </td>
@@ -359,7 +386,7 @@ export default function Dashboard() {
                       🤖 <span className="text-xs text-gray-400">AI</span>
                     </span>
                   ) : (
-                    "—"
+                    "Not handled"
                   )}
                 </td>
                 <td>
@@ -371,11 +398,11 @@ export default function Dashboard() {
                       ⚠️
                     </span>
                   ) : (
-                    "—"
+                    "None"
                   )}
                 </td>
 
-                <td>{cb.summary ?? "—"}</td>
+                <td>{cb.summary ?? "No summary"}</td>
                 <td>{new Date(cb.createdAt).toLocaleString()}</td>
                 <td>
                   {cb.status === "pending" && (
@@ -397,7 +424,7 @@ export default function Dashboard() {
                   )}
                   {cb.status !== "pending" &&
                     !cb.staffFollowupRequired &&
-                    cb.status !== "needs_staff" && "—"}
+                    cb.status !== "needs_staff" && "No action"}
                 </td>
               </tr>
             ))}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 
 type MetricsResponse = {
   uptimeSeconds: number;
@@ -31,6 +32,7 @@ type RecentEvent = {
 };
 
 export default function MetricsDashboard() {
+  const location = useLocation();
   const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [recentEvents, setRecentEvents] = useState<RecentEvent[]>([]);
@@ -128,6 +130,7 @@ export default function MetricsDashboard() {
   const minutes = Math.floor((uptime % 3600) / 60);
   const seconds = Math.floor(uptime % 60);
   const uptimeLabel = `${hours}h ${minutes}m ${seconds}s`;
+  const activeAlertCount = metrics?.activeAlerts.length ?? 0;
 
   const eventEntries = Object.entries(metrics?.eventCounts || {}).sort(
     (a, b) => b[1] - a[1]
@@ -167,6 +170,57 @@ export default function MetricsDashboard() {
           border: "1px solid rgba(28, 28, 28, 0.08)",
         }}
       >
+        <nav
+          style={{
+            display: "flex",
+            gap: "12px",
+            marginBottom: "20px",
+            fontSize: "14px",
+          }}
+        >
+          <Link
+            to="/"
+            style={{
+              padding: "6px 12px",
+              borderRadius: "999px",
+              textDecoration: "none",
+              color: location.pathname === "/" ? "#ffffff" : "#5a524b",
+              background: location.pathname === "/" ? "#1b1b1b" : "transparent",
+              border: "1px solid rgba(28, 28, 28, 0.12)",
+            }}
+          >
+            Dashboard
+          </Link>
+          <Link
+            to="/metrics"
+            style={{
+              padding: "6px 12px",
+              borderRadius: "999px",
+              textDecoration: "none",
+              color: location.pathname === "/metrics" ? "#ffffff" : "#5a524b",
+              background: location.pathname === "/metrics" ? "#1b1b1b" : "transparent",
+              border: "1px solid rgba(28, 28, 28, 0.12)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            Metrics
+            {activeAlertCount > 0 && (
+              <span
+                style={{
+                  padding: "2px 8px",
+                  borderRadius: "999px",
+                  fontSize: "12px",
+                  background: "#b42318",
+                  color: "#ffffff",
+                }}
+              >
+                {activeAlertCount}
+              </span>
+            )}
+          </Link>
+        </nav>
         <header
           style={{
             display: "flex",
@@ -201,14 +255,14 @@ export default function MetricsDashboard() {
               {uptimeLabel}
             </p>
             <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#7b726a" }}>
-              Last updated {lastUpdated || "—"}
+              Last updated {lastUpdated || "Not updated yet"}
             </p>
           </div>
         </header>
 
         <section style={{ marginTop: "28px" }}>
           <h2 style={{ fontSize: "20px", marginBottom: "12px" }}>
-            Active Alerts
+            Active Alerts Snapshot
           </h2>
           {loading && <p style={{ color: "#7b726a" }}>Loading metrics...</p>}
           {error && <p style={{ color: "#a23e3e" }}>{error}</p>}
@@ -244,7 +298,7 @@ export default function MetricsDashboard() {
                         style={{ padding: "14px 10px", color: "#7b726a" }}
                         colSpan={6}
                       >
-                        No active alerts.
+                        No active alerts at this time.
                       </td>
                     </tr>
                   )}
@@ -344,7 +398,7 @@ export default function MetricsDashboard() {
             Recent Alert Activity
           </h2>
           {alertEvents.length === 0 ? (
-            <p style={{ color: "#7b726a" }}>No alert activity.</p>
+            <p style={{ color: "#7b726a" }}>No recent alert activity.</p>
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -377,7 +431,7 @@ export default function MetricsDashboard() {
                         {event.environment}
                       </td>
                       <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
-                        {event.correlationId || "—"}
+                        {event.correlationId || "Not available"}
                       </td>
                     </tr>
                   ))}
@@ -392,7 +446,7 @@ export default function MetricsDashboard() {
             Operator Audit Timeline
           </h2>
           {auditEvents.length === 0 ? (
-            <p style={{ color: "#7b726a" }}>No recent audit events.</p>
+            <p style={{ color: "#7b726a" }}>No recent operator activity.</p>
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -425,7 +479,7 @@ export default function MetricsDashboard() {
                         {event.environment}
                       </td>
                       <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
-                        {event.correlationId || "—"}
+                        {event.correlationId || "Not available"}
                       </td>
                     </tr>
                   ))}

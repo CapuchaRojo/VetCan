@@ -1,98 +1,97 @@
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET;
-const EFFECTIVE_JWT_SECRET =
-  JWT_SECRET || (process.env.NODE_ENV === "test" ? "test-secret" : undefined);
+const RAW_NODE_ENV = process.env.NODE_ENV ?? "development";
 
-if (!EFFECTIVE_JWT_SECRET && process.env.NODE_ENV !== "test") {
-  throw new Error("JWT_SECRET must be set");
+const IS_PROD = RAW_NODE_ENV === "production";
+const IS_TEST = RAW_NODE_ENV === "test";
+const IS_DEV = !IS_PROD && !IS_TEST;
+
+function resolveJwtSecret(): string | null {
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+  if (IS_TEST) return "test-secret";
+  return null;
 }
 
-/**
- * Main auth middleware
- * Used by routes that require authentication
- */
 export default function requireAuth(
   req: Request,
   res: Response,
   next: NextFunction
 ) {
-  // ✅ Allow tests to selectively bypass auth via header
-  if (process.env.NODE_ENV === 'test' && req.headers['x-test-skip-auth'] === 'true') {
+  // ✅ Dev-only bypass (local dev UX)
+  if (IS_DEV) {
     return next();
   }
 
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  // ✅ Test-only explicit bypass (used by Jest)
+  if (
+    IS_TEST &&
+    req.headers["x-test-skip-auth"] === "true"
+  ) {
+    return next();
   }
 
-  const token = authHeader.replace('Bearer ', '');
+  const secret = resolveJwtSecret();
+  if (!secret) {
+    console.error("[auth] JWT_SECRET missing");
+    return res.status(500).json({ error: "Auth misconfigured" });
+  }
+
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const token = authHeader.slice("Bearer ".length).trim();
   if (!token) {
-    return res.status(401).json({ error: 'Invalid token' });
+    return res.status(401).json({ error: "Invalid token" });
   }
 
   try {
-    // Verify the JWT token
-    const decoded = jwt.verify(
-      token,
-      EFFECTIVE_JWT_SECRET as string
-    );
-
-    // Attach user info to request for downstream use
+    const decoded = jwt.verify(token, secret);
     (req as any).user = decoded;
-
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: 'Invalid token' });
+    return next();
+  } catch {
+    return res.status(401).json({ error: "Invalid token" });
   }
 }
 
-/**
- * Optional named export if needed elsewhere
- */
 export function optionalAuth(
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ) {
-  const authHeader = req.headers.authorization;
+  const secret = resolveJwtSecret();
+  if (!secret) return next();
 
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.replace('Bearer ', '');
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
     try {
-      const decoded = jwt.verify(
-        token,
-        EFFECTIVE_JWT_SECRET as string
-      );
+      const token = authHeader.slice("Bearer ".length).trim();
+      const decoded = jwt.verify(token, secret);
       (req as any).user = decoded;
-    } catch (error) {
-      // Silently fail for optional auth
+    } catch {
+      // silent
     }
   }
 
   next();
 }
 
-/**
- * Role-based authorization middleware
- * Use after requireAuth
- */
 export function requireRole(...allowedRoles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     const user = (req as any).user;
-    
+
     if (!user || !user.role) {
-      return res.status(403).json({ error: 'Forbidden: No role assigned' });
+      return res.status(403).json({ error: "Forbidden: No role assigned" });
     }
-    
+
     if (!allowedRoles.includes(user.role)) {
-      return res.status(403).json({ 
-        error: `Forbidden: Requires one of: ${allowedRoles.join(', ')}` 
+      return res.status(403).json({
+        error: `Forbidden: Requires one of: ${allowedRoles.join(", ")}`,
       });
     }
-    
+
     next();
   };
 }

@@ -11,6 +11,7 @@ import metricsRouter from "./metrics";
 import internalMetricsRouter from "./internalMetrics";
 import internalRouter from "./internal";
 import voiceRouter from "./voice";
+import authRouter from "./auth";
 
 const router = Router();
 
@@ -27,6 +28,7 @@ router.use("/stats", stats);
 router.use("/metrics", metricsRouter);
 router.use("/internal/metrics", internalMetricsRouter);
 router.use("/internal", internalRouter);
+router.use("/auth", authRouter);
 
 /* -------------------------------------------------
    VOICE ROUTES

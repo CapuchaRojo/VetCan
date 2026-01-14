@@ -7,6 +7,10 @@ const IS_PROD = RAW_NODE_ENV === "production";
 const IS_TEST = RAW_NODE_ENV === "test";
 const IS_DEV = !IS_PROD && !IS_TEST;
 
+// ✅ ADD THIS LINE (this is what’s missing)
+const ALLOW_DEV_AUTH_BYPASS =
+  process.env.ALLOW_DEV_AUTH_BYPASS === "true";
+
 function resolveJwtSecret(): string | null {
   if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
   if (IS_TEST) return "test-secret";
@@ -18,10 +22,15 @@ export default function requireAuth(
   res: Response,
   next: NextFunction
 ) {
-  // ✅ Dev-only bypass (local dev UX)
+  // ✅ Explicit dev/test bypass (opt-in only)
+if (!IS_PROD && ALLOW_DEV_AUTH_BYPASS) {
   if (IS_DEV) {
     return next();
   }
+  if (IS_TEST && req.headers["x-test-skip-auth"] === "true") {
+    return next();
+  }
+}
 
   // ✅ Test-only explicit bypass (used by Jest)
   if (

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { apiFetch } from "../lib/apiFetch";
 
 type MetricsResponse = {
   uptimeSeconds: number;
@@ -44,7 +45,7 @@ export default function MetricsDashboard() {
     let isMounted = true;
     const fetchMetrics = async () => {
       try {
-        const res = await fetch("/api/internal/metrics");
+        const res = await apiFetch("/api/internal/metrics");
         if (!res.ok) {
           console.warn(`[metrics] HTTP ${res.status}`);
           throw new Error("Metrics request failed");
@@ -77,7 +78,7 @@ export default function MetricsDashboard() {
     let isMounted = true;
     const fetchStatus = async () => {
       try {
-        const res = await fetch("/api/internal/status");
+        const res = await apiFetch("/api/internal/status");
         if (!res.ok) {
           throw new Error("Status request failed");
         }
@@ -103,7 +104,7 @@ export default function MetricsDashboard() {
     let isMounted = true;
     const fetchRecentEvents = async () => {
       try {
-        const res = await fetch("/api/internal/events/recent?limit=50");
+        const res = await apiFetch("/api/internal/events/recent?limit=50");
         if (!res.ok) {
           throw new Error("Recent events request failed");
         }

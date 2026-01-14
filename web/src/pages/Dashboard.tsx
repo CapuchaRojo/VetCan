@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { apiFetch } from "../lib/apiFetch";
 
 type FilterMode = "all" | "pending" | "ai" | "staff";
 
@@ -44,7 +45,7 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchCallbacks = async () => {
       try {
-        const res = await fetch("/api/callbacks");
+        const res = await apiFetch("/api/callbacks");
         const data: Callback[] = await res.json();
 
         setCallbacks(data);
@@ -71,7 +72,7 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchAlerts = async () => {
       try {
-        const res = await fetch("/api/internal/alerts/active");
+        const res = await apiFetch("/api/internal/alerts/active");
         if (!res.ok) throw new Error("Alert fetch failed");
         const data: ActiveAlert[] = await res.json();
         setAlerts(data);
@@ -119,7 +120,7 @@ export default function Dashboard() {
     try {
       setLoadingId(id);
 
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/callbacks/${id}/ai-call?demo=true`,
         {
           method: "POST",
@@ -148,7 +149,7 @@ export default function Dashboard() {
       }
 
       // 🔁 Non-demo fallback
-      const updated = await fetch("/api/callbacks").then(r => r.json());
+      const updated = await apiFetch("/api/callbacks").then(r => r.json());
       setCallbacks(updated);
     } catch (err) {
       console.error("AI callback error", err);
@@ -160,7 +161,7 @@ export default function Dashboard() {
 
   async function acknowledgeAlert(id: string) {
     try {
-      const res = await fetch(`/api/internal/alerts/${id}/acknowledge`, {
+      const res = await apiFetch(`/api/internal/alerts/${id}/acknowledge`, {
         method: "POST",
       });
       if (!res.ok) throw new Error("Acknowledge failed");
@@ -177,11 +178,11 @@ export default function Dashboard() {
 
   async function markStaffHandled(id: string) {
     try {
-      const res = await fetch(`/api/internal/callbacks/${id}/mark-staff-handled`, {
+      const res = await apiFetch(`/api/internal/callbacks/${id}/mark-staff-handled`, {
         method: "POST",
       });
       if (!res.ok) throw new Error("Mark handled failed");
-      const updated = await fetch("/api/callbacks").then(r => r.json());
+      const updated = await apiFetch("/api/callbacks").then(r => r.json());
       setCallbacks(updated);
     } catch (err) {
       console.error("Mark staff handled error", err);

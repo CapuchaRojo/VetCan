@@ -9,6 +9,7 @@ import smsRouter from "./sms";
 import stats from "./stats";
 import metricsRouter from "./metrics";
 import internalMetricsRouter from "./internalMetrics";
+import internalRouter from "./internal";
 import voiceRouter from "./voice";
 
 const router = Router();
@@ -25,6 +26,7 @@ router.use("/webhooks/twilio", smsRouter);
 router.use("/stats", stats);
 router.use("/metrics", metricsRouter);
 router.use("/internal/metrics", internalMetricsRouter);
+router.use("/internal", internalRouter);
 
 /* -------------------------------------------------
    VOICE ROUTES

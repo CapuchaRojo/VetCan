@@ -146,6 +146,25 @@ infra/   Dockerfiles & compose configs
 db/      Postgres 15
 redis/   Redis 7 (queues + lightweight caching)
 
+Admin Observability & Control (A5.4)
+
+Features:
+- In-memory alert resolution tracking and resolution events
+- Internal status + recent events endpoints for operators
+- Admin action hooks for alert acknowledgement and callback handoff
+
+Internal Endpoints:
+GET /api/internal/status
+GET /api/internal/metrics
+GET /api/internal/events/recent?limit=50
+POST /api/internal/alerts/:id/acknowledge
+POST /api/internal/callbacks/:id/mark-staff-handled
+
+Operator Use Cases:
+- Verify uptime, alert engine state, and event forwarder status
+- Review recent non-sensitive events for audit context
+- Acknowledge alerts and mark callbacks as staff-handled without deleting records
+
 Core Concepts
 Callback Lifecycle
 

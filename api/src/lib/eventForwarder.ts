@@ -3,6 +3,7 @@ import https from "node:https";
 import { onEvent, type EventName } from "./events";
 
 let initialized = false;
+let forwarderEnabled = false;
 
 const EVENT_NAMES: EventName[] = [
   "voice_state_transition",
@@ -13,6 +14,9 @@ const EVENT_NAMES: EventName[] = [
   "ai_call_initiated",
   "appointment_create_result",
   "alert_triggered",
+  "alert_resolved",
+  "alert_acknowledged",
+  "callback_marked_staff_handled",
 ];
 
 export function initEventForwarder() {
@@ -29,6 +33,8 @@ export function initEventForwarder() {
     console.warn("[events] Invalid EVENT_WEBHOOK_URL; forwarding disabled.");
     return;
   }
+
+  forwarderEnabled = true;
 
   const isHttps = target.protocol === "https:";
   const httpClient = isHttps ? https : http;
@@ -67,9 +73,7 @@ export function initEventForwarder() {
           "content-length": Buffer.byteLength(body),
         },
       },
-      (res) => {
-        res.resume();
-      }
+      (res) => res.resume()
     );
 
     req.on("error", () => {
@@ -83,4 +87,8 @@ export function initEventForwarder() {
   for (const eventName of EVENT_NAMES) {
     onEvent(eventName, (payload) => postEvent(eventName, payload));
   }
+}
+
+export function isEventForwarderEnabled() {
+  return forwarderEnabled;
 }

@@ -4,12 +4,18 @@ import { emitEvent, getEventCounts } from "./events";
  * Alert state tracked in-memory
  */
 type AlertState = {
+  id: string;
   alertType: string;
   eventName: string;
   count: number;
   threshold: number;
   windowSeconds: number;
   firstTriggeredAt: string;
+  resolvedAt?: string;
+  durationSeconds?: number;
+  acknowledgedAt?: string;
+  environment: string;
+  correlationId?: string;
 };
 
 /**
@@ -118,30 +124,61 @@ export function initAlertEvaluator() {
       if (count >= rule.threshold) {
         if (!activeAlerts.has(key)) {
           const alert: AlertState = {
+            id: key,
             alertType: rule.alertType,
             eventName: rule.eventName,
             count,
             threshold: rule.threshold,
             windowSeconds,
             firstTriggeredAt: new Date().toISOString(),
+            environment: process.env.NODE_ENV || "local",
           };
 
           activeAlerts.set(key, alert);
 
-          // 🔔 Single, canonical alert event
+          // 🔔 Single, canonical trigger event
           emitEvent("alert_triggered", {
             alertType: alert.alertType,
             eventName: alert.eventName,
             count: alert.count,
             threshold: alert.threshold,
             windowSeconds: alert.windowSeconds,
-            environment: process.env.NODE_ENV || "local",
+            environment: alert.environment,
             triggeredAt: alert.firstTriggeredAt,
           });
         } else {
+          // Alert still active → update count only
           activeAlerts.get(key)!.count = count;
         }
       } else {
+        const existing = activeAlerts.get(key);
+        if (existing) {
+          const resolvedAt = new Date().toISOString();
+          const durationSeconds = Math.max(
+            0,
+            Math.floor(
+              (Date.parse(resolvedAt) -
+                Date.parse(existing.firstTriggeredAt)) /
+                1000
+            )
+          );
+
+          existing.resolvedAt = resolvedAt;
+          existing.durationSeconds = durationSeconds;
+
+          emitEvent("alert_resolved", {
+            alertType: existing.alertType,
+            eventName: existing.eventName,
+            count: existing.count,
+            threshold: existing.threshold,
+            windowSeconds: existing.windowSeconds,
+            environment: existing.environment,
+            triggeredAt: existing.firstTriggeredAt,
+            resolvedAt,
+            durationSeconds,
+            correlationId: existing.correlationId,
+          });
+        }
         activeAlerts.delete(key);
       }
     }
@@ -157,4 +194,15 @@ export function initAlertEvaluator() {
  */
 export function getActiveAlerts(): AlertState[] {
   return Array.from(activeAlerts.values());
+}
+
+export function isAlertEvaluatorInitialized() {
+  return initialized;
+}
+
+export function acknowledgeAlert(alertId: string) {
+  const alert = activeAlerts.get(alertId);
+  if (!alert) return null;
+  alert.acknowledgedAt = new Date().toISOString();
+  return alert;
 }

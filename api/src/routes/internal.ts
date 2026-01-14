@@ -11,6 +11,8 @@ import requireAuth, { requireRole } from "../middleware/auth";
 
 const router = Router();
 
+router.use(requireAuth);
+
 router.get("/status", (_req, res) => {
   res.json({
     uptimeSeconds: Math.floor(process.uptime()),
@@ -27,7 +29,11 @@ router.get("/events/recent", (req, res) => {
   res.json(getRecentEvents(safeLimit));
 });
 
-router.post("/alerts/:id/acknowledge", requireAuth, requireRole("admin"), (req, res) => {
+router.get("/alerts/active", (_req, res) => {
+  res.json(getActiveAlerts());
+});
+
+router.post("/alerts/:id/acknowledge", requireRole("admin"), (req, res) => {
   const { id } = req.params;
   const alert = acknowledgeAlert(id);
   if (!alert) {
@@ -48,7 +54,6 @@ router.post("/alerts/:id/acknowledge", requireAuth, requireRole("admin"), (req, 
 
 router.post(
   "/callbacks/:id/mark-staff-handled",
-  requireAuth,
   requireRole("admin"),
   async (req, res) => {
     const { id } = req.params;

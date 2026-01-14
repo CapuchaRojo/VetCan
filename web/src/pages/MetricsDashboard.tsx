@@ -15,8 +15,25 @@ type MetricsResponse = {
   }>;
 };
 
+type StatusResponse = {
+  uptimeSeconds: number;
+  environment: string;
+  alertEngineInitialized: boolean;
+  activeAlertCount: number;
+  eventForwarderEnabled: boolean;
+};
+
+type RecentEvent = {
+  eventName: string;
+  timestamp: string;
+  correlationId?: string;
+  environment: string;
+};
+
 export default function MetricsDashboard() {
   const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
+  const [status, setStatus] = useState<StatusResponse | null>(null);
+  const [recentEvents, setRecentEvents] = useState<RecentEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
@@ -54,6 +71,58 @@ export default function MetricsDashboard() {
     };
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch("/api/internal/status");
+        if (!res.ok) {
+          throw new Error("Status request failed");
+        }
+        const data: StatusResponse = await res.json();
+        if (!isMounted) return;
+        setStatus(data);
+      } catch {
+        if (!isMounted) return;
+        setStatus(null);
+      }
+    };
+
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchRecentEvents = async () => {
+      try {
+        const res = await fetch("/api/internal/events/recent?limit=50");
+        if (!res.ok) {
+          throw new Error("Recent events request failed");
+        }
+        const data: RecentEvent[] = await res.json();
+        if (!isMounted) return;
+        setRecentEvents(data);
+      } catch {
+        if (!isMounted) return;
+        setRecentEvents([]);
+      }
+    };
+
+    fetchRecentEvents();
+    const interval = setInterval(fetchRecentEvents, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   const uptime = metrics?.uptimeSeconds ?? 0;
   const hours = Math.floor(uptime / 3600);
   const minutes = Math.floor((uptime % 3600) / 60);
@@ -62,6 +131,18 @@ export default function MetricsDashboard() {
 
   const eventEntries = Object.entries(metrics?.eventCounts || {}).sort(
     (a, b) => b[1] - a[1]
+  );
+
+  const alertEvents = recentEvents.filter(event =>
+    ["alert_triggered", "alert_resolved", "alert_acknowledged"].includes(
+      event.eventName
+    )
+  );
+
+  const auditEvents = recentEvents.filter(event =>
+    ["alert_triggered", "alert_resolved", "alert_acknowledged", "callback_marked_staff_handled"].includes(
+      event.eventName
+    )
   );
 
   return (
@@ -186,6 +267,165 @@ export default function MetricsDashboard() {
                       </td>
                       <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
                         {new Date(alert.triggeredAt).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section style={{ marginTop: "28px" }}>
+          <h2 style={{ fontSize: "20px", marginBottom: "12px" }}>
+            System Status
+          </h2>
+          {!status ? (
+            <p style={{ color: "#7b726a" }}>Status unavailable.</p>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: "12px",
+              }}
+            >
+              <article
+                style={{
+                  padding: "14px 16px",
+                  borderRadius: "14px",
+                  background: "#f9f4ee",
+                  border: "1px solid #e4dbd0",
+                }}
+              >
+                <p style={{ margin: 0, fontSize: "12px", color: "#7b726a" }}>
+                  Alert Engine
+                </p>
+                <p style={{ margin: "8px 0 0", fontSize: "18px" }}>
+                  {status.alertEngineInitialized ? "Initialized" : "Disabled"}
+                </p>
+              </article>
+              <article
+                style={{
+                  padding: "14px 16px",
+                  borderRadius: "14px",
+                  background: "#f9f4ee",
+                  border: "1px solid #e4dbd0",
+                }}
+              >
+                <p style={{ margin: 0, fontSize: "12px", color: "#7b726a" }}>
+                  Active Alerts
+                </p>
+                <p style={{ margin: "8px 0 0", fontSize: "18px" }}>
+                  {status.activeAlertCount}
+                </p>
+              </article>
+              <article
+                style={{
+                  padding: "14px 16px",
+                  borderRadius: "14px",
+                  background: "#f9f4ee",
+                  border: "1px solid #e4dbd0",
+                }}
+              >
+                <p style={{ margin: 0, fontSize: "12px", color: "#7b726a" }}>
+                  Event Forwarder
+                </p>
+                <p style={{ margin: "8px 0 0", fontSize: "18px" }}>
+                  {status.eventForwarderEnabled ? "Enabled" : "Disabled"}
+                </p>
+              </article>
+            </div>
+          )}
+        </section>
+
+        <section style={{ marginTop: "28px" }}>
+          <h2 style={{ fontSize: "20px", marginBottom: "12px" }}>
+            Recent Alert Activity
+          </h2>
+          {alertEvents.length === 0 ? (
+            <p style={{ color: "#7b726a" }}>No alert activity.</p>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ textAlign: "left", background: "#f0ebe4" }}>
+                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
+                      Event
+                    </th>
+                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
+                      Timestamp
+                    </th>
+                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
+                      Environment
+                    </th>
+                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
+                      Correlation
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {alertEvents.map((event, idx) => (
+                    <tr key={`${event.eventName}-${event.timestamp}-${idx}`}>
+                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
+                        {event.eventName}
+                      </td>
+                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
+                        {new Date(event.timestamp).toLocaleString()}
+                      </td>
+                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
+                        {event.environment}
+                      </td>
+                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
+                        {event.correlationId || "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section style={{ marginTop: "28px" }}>
+          <h2 style={{ fontSize: "20px", marginBottom: "12px" }}>
+            Operator Audit Timeline
+          </h2>
+          {auditEvents.length === 0 ? (
+            <p style={{ color: "#7b726a" }}>No recent audit events.</p>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ textAlign: "left", background: "#f0ebe4" }}>
+                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
+                      Event
+                    </th>
+                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
+                      Timestamp
+                    </th>
+                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
+                      Environment
+                    </th>
+                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
+                      Correlation
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditEvents.map((event, idx) => (
+                    <tr key={`${event.eventName}-${event.timestamp}-${idx}`}>
+                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
+                        {event.eventName}
+                      </td>
+                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
+                        {new Date(event.timestamp).toLocaleString()}
+                      </td>
+                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
+                        {event.environment}
+                      </td>
+                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
+                        {event.correlationId || "—"}
                       </td>
                     </tr>
                   ))}

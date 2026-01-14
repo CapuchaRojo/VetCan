@@ -1,17 +1,22 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+const apiTarget =
+  process.env.DOCKER === "true"
+    ? "http://vetcan-api:4000"
+    : "http://localhost:4000";
+
 export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
       "/api": {
-        target: "http://localhost:4000",
+        target: apiTarget,
         changeOrigin: true,
         secure: false,
       },
       "/internal": {
-        target: "http://localhost:4000",
+        target: apiTarget,
         changeOrigin: true,
         secure: false,
       },

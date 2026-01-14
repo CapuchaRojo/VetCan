@@ -16,6 +16,16 @@ type Callback = {
   summary?: string | null;
 };
 
+type ActiveAlert = {
+  id: string;
+  alertType: string;
+  eventName: string;
+  count: number;
+  threshold: number;
+  firstTriggeredAt: string;
+  acknowledgedAt?: string;
+};
+
 export default function Dashboard() {
   const [callbacks, setCallbacks] = useState<Callback[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -26,6 +36,8 @@ export default function Dashboard() {
   const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [demoIds, setDemoIds] = useState<Set<string>>(new Set());
+  const [alerts, setAlerts] = useState<ActiveAlert[]>([]);
+  const [alertsError, setAlertsError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCallbacks = async () => {
@@ -51,6 +63,24 @@ export default function Dashboard() {
     fetchCallbacks();
     const interval = setInterval(fetchCallbacks, 15000);
 
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        const res = await fetch("/api/internal/alerts/active");
+        if (!res.ok) throw new Error("Alert fetch failed");
+        const data: ActiveAlert[] = await res.json();
+        setAlerts(data);
+        setAlertsError(null);
+      } catch (err) {
+        setAlertsError("Unable to load alerts.");
+      }
+    };
+
+    fetchAlerts();
+    const interval = setInterval(fetchAlerts, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -124,6 +154,36 @@ export default function Dashboard() {
     }
   }
 
+  async function acknowledgeAlert(id: string) {
+    try {
+      const res = await fetch(`/api/internal/alerts/${id}/acknowledge`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Acknowledge failed");
+      setAlerts(prev =>
+        prev.map(alert =>
+          alert.id === id ? { ...alert, acknowledgedAt: new Date().toISOString() } : alert
+        )
+      );
+    } catch (err) {
+      console.error("Alert acknowledge error", err);
+      setAlertsError("Unable to acknowledge alert.");
+    }
+  }
+
+  async function markStaffHandled(id: string) {
+    try {
+      const res = await fetch(`/api/internal/callbacks/${id}/mark-staff-handled`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Mark handled failed");
+      const updated = await fetch("/api/callbacks").then(r => r.json());
+      setCallbacks(updated);
+    } catch (err) {
+      console.error("Mark staff handled error", err);
+    }
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <h1 className="text-2xl font-semibold mb-1">VetCan Admin Dashboard</h1>
@@ -141,6 +201,65 @@ export default function Dashboard() {
       )}
 
       <p className="text-gray-500 mb-6">Welcome to the control center.</p>
+
+      {/* Active Alerts */}
+      <div className="mb-8">
+        <h2 className="text-lg font-semibold mb-2">Active Alerts</h2>
+        {alertsError && (
+          <p className="text-sm text-red-600 mb-2">{alertsError}</p>
+        )}
+        {alerts.length === 0 ? (
+          <p className="text-sm text-gray-500">No active alerts.</p>
+        ) : (
+          <div className="overflow-auto border rounded">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-left">
+                <tr>
+                  <th className="p-2 border-b">ID</th>
+                  <th className="p-2 border-b">Alert</th>
+                  <th className="p-2 border-b">Event</th>
+                  <th className="p-2 border-b">Count</th>
+                  <th className="p-2 border-b">Threshold</th>
+                  <th className="p-2 border-b">Triggered</th>
+                  <th className="p-2 border-b">Acknowledged</th>
+                  <th className="p-2 border-b">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {alerts.map(alert => (
+                  <tr key={alert.id} className="border-t">
+                    <td className="p-2">{alert.id}</td>
+                    <td className="p-2">{alert.alertType}</td>
+                    <td className="p-2">{alert.eventName}</td>
+                    <td className="p-2">{alert.count}</td>
+                    <td className="p-2">{alert.threshold}</td>
+                    <td className="p-2">
+                      {new Date(alert.firstTriggeredAt).toLocaleString()}
+                    </td>
+                    <td className="p-2">
+                      {alert.acknowledgedAt
+                        ? new Date(alert.acknowledgedAt).toLocaleString()
+                        : "—"}
+                    </td>
+                    <td className="p-2">
+                      {alert.acknowledgedAt ? (
+                        "—"
+                      ) : (
+                        <button
+                          onClick={() => acknowledgeAlert(alert.id)}
+                          className="px-2 py-1 border rounded text-xs"
+                        >
+                          Acknowledge
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
@@ -259,17 +378,26 @@ export default function Dashboard() {
                 <td>{cb.summary ?? "—"}</td>
                 <td>{new Date(cb.createdAt).toLocaleString()}</td>
                 <td>
-                  {cb.status === "pending" ? (
+                  {cb.status === "pending" && (
                     <button
                       onClick={() => attemptAiCallback(cb.id)}
                       disabled={loadingId === cb.id}
-                      className="px-2 py-1 bg-indigo-600 text-white rounded"
+                      className="px-2 py-1 bg-indigo-600 text-white rounded mr-2"
                     >
                       {loadingId === cb.id ? "Calling AI…" : "Attempt AI Callback"}
                     </button>
-                  ) : (
-                    "—"
                   )}
+                  {(cb.staffFollowupRequired || cb.status === "needs_staff") && (
+                    <button
+                      onClick={() => markStaffHandled(cb.id)}
+                      className="px-2 py-1 border rounded"
+                    >
+                      Mark Staff Handled
+                    </button>
+                  )}
+                  {cb.status !== "pending" &&
+                    !cb.staffFollowupRequired &&
+                    cb.status !== "needs_staff" && "—"}
                 </td>
               </tr>
             ))}

@@ -1,8 +1,11 @@
 import { Router } from "express";
 import { getEventCounts } from "../lib/events";
 import { getActiveAlerts } from "../lib/alerts";
+import requireAuth from "../middleware/auth";
 
 const router = Router();
+
+router.use(requireAuth);
 
 router.get("/", (_req, res) => {
   // Read-only operational metrics; no request data or payloads exposed.

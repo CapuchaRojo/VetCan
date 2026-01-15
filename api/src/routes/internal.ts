@@ -11,13 +11,7 @@ import requireAuth, { requireRole } from "../middleware/auth";
 
 const router = Router();
 
-const isDev = process.env.NODE_ENV !== "production";
-
-if (!isDev) {
-  router.use(requireAuth);
-}
-
-router.get("/status", (_req, res) => {
+router.get("/status", requireAuth, (_req, res) => {
   res.json({
     uptimeSeconds: Math.floor(process.uptime()),
     environment: process.env.NODE_ENV || "local",
@@ -27,7 +21,7 @@ router.get("/status", (_req, res) => {
   });
 });
 
-router.get("/events/recent", (req, res) => {
+router.get("/events/recent", requireAuth, (req, res) => {
   const limit = Number(req.query.limit);
   const safeLimit = Number.isFinite(limit) ? limit : 50;
   res.json(getRecentEvents(safeLimit));

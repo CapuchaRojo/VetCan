@@ -2,6 +2,7 @@
 import app from './app';
 import { initEventForwarder } from './lib/eventForwarder';
 import { initAlertEvaluator } from './lib/alerts';
+import { assertSafeProductionEnv } from './lib/envGuards';
 
 function validateRequiredEnv() {
   if (process.env.NODE_ENV === 'test') return;
@@ -20,6 +21,7 @@ function validateRequiredEnv() {
   throw new Error(`[config] ${details}`);
 }
 
+assertSafeProductionEnv();
 validateRequiredEnv();
 initEventForwarder();
 initAlertEvaluator();

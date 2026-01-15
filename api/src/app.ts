@@ -9,8 +9,8 @@ import {
 
 const app = express();
 
-app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+app.use(express.json({ limit: "1mb" }));
 
 // 🔒 Rate limit + log ONLY API traffic
 app.use('/api', apiLimiter);

@@ -196,6 +196,43 @@ Escalation permanently halts AI handling
 
 These guardrails are enforced at the API layer, not the UI.
 
+## Development Authentication
+
+In development, a short-lived dev JWT can be generated to access protected endpoints.
+
+This is disabled in production.
+
+Env flag:
+- `ALLOW_DEV_AUTH_BYPASS=true` (dev only)
+
+Production startup will fail if this flag is enabled.
+
+## JWT Claims
+
+VetCan expects the following JWT claims:
+
+- `sub` — operator identifier
+- `role` — operator role (e.g. admin, staff)
+- `name` — display name for audit attribution
+
+These claims are used for:
+- Authorization
+- Operator attribution
+- Audit events
+
+## Production Safety
+
+VetCan will refuse to start in production if:
+
+- `ALLOW_DEV_AUTH_BYPASS=true`
+- `AI_CALLBACK_SIMULATION=true`
+- `DATABASE_URL` points to SQLite or file-based DBs
+
+These guards prevent unsafe deployments.
+
+“Zod is used for request payload validation to prevent malformed input and Prisma error leakage.”
+
+
 Quick Start (Local)
 1) Configure environment
 cp .env.example .env

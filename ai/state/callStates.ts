@@ -4,10 +4,14 @@ export enum CallState {
   INIT = "INIT",
   GREETING = "GREETING",
   LISTENING = "LISTENING",
+
+  HOURS = "HOURS",
+
   PROVIDE_INFO = "PROVIDE_INFO",
   OFFER_CALLBACK = "OFFER_CALLBACK",
   COLLECT_PHONE = "COLLECT_PHONE",
   CONFIRM_CALLBACK = "CONFIRM_CALLBACK",
+
   FALLBACK = "FALLBACK",
   END = "END",
 }
@@ -18,12 +22,13 @@ export const ALLOWED_TRANSITIONS: Record<CallState, CallState[]> = {
   [CallState.GREETING]: [CallState.LISTENING],
 
   [CallState.LISTENING]: [
+    CallState.HOURS,
     CallState.PROVIDE_INFO,
     CallState.OFFER_CALLBACK,
     CallState.FALLBACK,
   ],
 
-  [CallState.PROVIDE_INFO]: [
+  [CallState.HOURS]: [
     CallState.LISTENING,
     CallState.OFFER_CALLBACK,
     CallState.END,
@@ -49,6 +54,7 @@ export const ALLOWED_TRANSITIONS: Record<CallState, CallState[]> = {
   [CallState.END]: [],
 };
 
+export type CallState = typeof CALL_STATES[number];
 
 export function isValidTransition(
   from: CallState,

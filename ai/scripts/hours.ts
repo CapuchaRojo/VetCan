@@ -1,5 +1,4 @@
 // ai/scripts/hours.ts
-
 export type BusinessHours = {
   days: string;
   open: string;

@@ -3,6 +3,9 @@ import { getCorrelationId } from "./requestContext";
 
 export type EventName =
   | "voice_state_transition"
+  | "voice_call_started"
+  | "voice_intent_detected"
+  | "voice_call_completed"
   | "validation_failed"
   | "callback_create_attempt"
   | "callback_create_result"
@@ -17,6 +20,21 @@ export type EventName =
 
 export type EventPayloads = {
   voice_state_transition: { from: string; to: string };
+  voice_call_started: {
+    callSid: string;
+    source: "voice";
+    environment: string;
+  };
+  voice_intent_detected: {
+    callSid: string;
+    intent: "general_inquiry";
+    environment: string;
+  };
+  voice_call_completed: {
+    callSid: string;
+    finalState: string;
+    environment: string;
+  };
   validation_failed: { scope: "voice" | "appointments"; reason: string; state?: string };
   callback_create_attempt: { source: "voice" };
   callback_create_result: { source: "voice"; ok: boolean };

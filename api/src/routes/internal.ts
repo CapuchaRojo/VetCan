@@ -8,6 +8,7 @@ import {
 } from "../lib/alerts";
 import { isEventForwarderEnabled } from "../lib/eventForwarder";
 import requireAuth, { requireRole } from "../middleware/auth";
+import { IS_DEV } from "../config/env";
 
 const router = Router();
 
@@ -34,7 +35,7 @@ router.get("/alerts/active", (_req, res) => {
 router.post(
   "/events/emit",
   (req, res, next) => {
-    if (process.env.NODE_ENV === "production") {
+    if (!IS_DEV) {
       return res.status(404).json({ error: "Route not found" });
     }
     return next();

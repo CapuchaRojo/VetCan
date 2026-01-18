@@ -5,8 +5,9 @@ const isDocker =
   String(process.env.DOCKER || "")
     .trim()
     .toLowerCase() === "true";
+    
 const apiTarget = isDocker
-  ? "http://vetcan-api:4000"
+  ? "http://api:4000"
   : "http://localhost:4000";
 
 export default defineConfig({

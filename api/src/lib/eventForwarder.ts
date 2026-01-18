@@ -7,6 +7,9 @@ let forwarderEnabled = false;
 
 const EVENT_NAMES: EventName[] = [
   "voice_state_transition",
+  "voice_call_started",
+  "voice_intent_detected",
+  "voice_call_completed",
   "validation_failed",
   "callback_create_attempt",
   "callback_create_result",

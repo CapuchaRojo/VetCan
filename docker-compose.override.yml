@@ -1,0 +1,6 @@
+services:
+  api:
+    environment:
+      NODE_ENV: development
+      ALLOW_DEV_AUTH_BYPASS: "true"
+      ALLOW_DEV_EVENTS: "true"

@@ -27,6 +27,8 @@ import {
 
 const router = Router();
 const VoiceResponse = twilio.twiml.VoiceResponse;
+const startedCalls = new Set<string>();
+const intentEmittedCalls = new Set<string>();
 
 /**
  * Shared Twilio voice config
@@ -91,6 +93,15 @@ function applyPlan(twiml: twilio.twiml.VoiceResponse, plan: TwimlPlan) {
  * POST /api/voice/inbound
  */
 router.post("/voice/inbound", (_req, res) => {
+  const callSid = String(_req.body?.CallSid || "").trim();
+  if (callSid && !startedCalls.has(callSid)) {
+    startedCalls.add(callSid);
+    emitEvent("voice_call_started", {
+      callSid,
+      source: "voice",
+      environment: process.env.NODE_ENV || "local",
+    });
+  }
   const twiml = new VoiceResponse();
   const plan = buildInboundPlan();
   applyPlan(twiml, plan);
@@ -104,8 +115,28 @@ router.post("/voice/inbound", (_req, res) => {
 router.post("/voice/intent", (req, res) => {
   const twiml = new VoiceResponse();
   const speech = String(req.body.SpeechResult || "").trim();
-  const { plan } = buildIntentPlan(speech);
+  const { plan, context } = buildIntentPlan(speech);
+  const callSid = String(req.body?.CallSid || "").trim();
+  if (
+    callSid &&
+    context.intent === "general_question" &&
+    !intentEmittedCalls.has(callSid)
+  ) {
+    intentEmittedCalls.add(callSid);
+    emitEvent("voice_intent_detected", {
+      callSid,
+      intent: "general_inquiry",
+      environment: process.env.NODE_ENV || "local",
+    });
+  }
   applyPlan(twiml, plan);
+  if (plan.hangup && callSid) {
+    emitEvent("voice_call_completed", {
+      callSid,
+      finalState: plan.nextState,
+      environment: process.env.NODE_ENV || "local",
+    });
+  }
 
   res.type("text/xml").send(twiml.toString());
 });
@@ -119,6 +150,7 @@ router.post("/voice/general-inquiry", (req, res) => {
   const state = isGeneralInquiryState(rawState) ? rawState : "GREETING";
   const speech = String(req.body.SpeechResult || req.body.Digits || "").trim();
   const phone = String(req.query.phone || "").trim();
+  const callSid = String(req.body?.CallSid || "").trim();
 
   const plan = buildGeneralInquiryPlan({
     state,
@@ -127,6 +159,13 @@ router.post("/voice/general-inquiry", (req, res) => {
   });
 
   applyPlan(twiml, plan);
+  if (plan.hangup && callSid) {
+    emitEvent("voice_call_completed", {
+      callSid,
+      finalState: "END",
+      environment: process.env.NODE_ENV || "local",
+    });
+  }
   res.type("text/xml").send(twiml.toString());
 });
 
@@ -158,6 +197,7 @@ router.post("/voice/phone", (req, res) => {
  */
 router.post("/voice/time", async (req, res) => {
   const twiml = new VoiceResponse();
+  const callSid = String(req.body?.CallSid || "").trim();
 
   const rawName = req.query.name;
   const { name, reason } = validateNameInput(rawName);
@@ -203,12 +243,26 @@ router.post("/voice/time", async (req, res) => {
     twiml.say(VOICE, pickLine(VOICE_LINES.schedulingConfirm));
     twiml.say(VOICE, pickLine(VOICE_LINES.staffHandoff));
     twiml.hangup();
+    if (callSid) {
+      emitEvent("voice_call_completed", {
+        callSid,
+        finalState: "complete",
+        environment: process.env.NODE_ENV || "local",
+      });
+    }
   } catch (err) {
     emitEvent("callback_create_failed", { source: "voice" });
     emitEvent("callback_create_result", { source: "voice", ok: false });
     console.error("[voice callback error]", err);
     twiml.say(VOICE, pickLine(VOICE_LINES.retry));
     twiml.hangup();
+    if (callSid) {
+      emitEvent("voice_call_completed", {
+        callSid,
+        finalState: "complete",
+        environment: process.env.NODE_ENV || "local",
+      });
+    }
   }
 
   res.type("text/xml").send(twiml.toString());

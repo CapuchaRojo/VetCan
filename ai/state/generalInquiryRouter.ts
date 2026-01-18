@@ -1,44 +1,52 @@
-import { CallState } from "./callStates";
-import { CallContext } from "./callContext";
-
-import { handleGreeting } from "../handlers/greeting";
-import { handleHours } from "../handlers/hours";
-import { handleFallback } from "../handlers/fallback";
+import { CallState, isValidTransition } from "./callStates";
+import type { CallContext } from "../runtime/callContext";
+import { greetingHandler } from "../handlers/greeting";
+import { hoursHandler } from "../handlers/hours";
+import { fallbackHandler } from "../handlers/fallback";
+import { resolveNextState } from "../runtime/intentRouter";
 
 export async function routeGeneralInquiry(
   ctx: CallContext
 ): Promise<CallContext> {
   switch (ctx.state) {
-    case CallState.GREETING:
-      await handleGreeting(ctx);
+    case CallState.INIT:
       return {
         ...ctx,
-        state: CallState.HOURS,
+        state: CallState.GREETING,
       };
 
-    case CallState.HOURS:
-      await handleHours(ctx);
+    case CallState.GREETING:
+      greetingHandler(ctx);
       return {
         ...ctx,
-        state: CallState.COMPLETE,
-        resolved: true,
+        state: CallState.LISTENING,
+      };
+
+    case CallState.LISTENING: {
+      const next = resolveNextState(ctx.lastUserInput || "");
+      if (!isValidTransition(ctx.state, next)) {
+        return { ...ctx, state: CallState.FALLBACK };
+      }
+      return { ...ctx, state: next };
+    }
+
+    case CallState.PROVIDE_INFO:
+      hoursHandler(ctx);
+      return {
+        ...ctx,
+        state: CallState.OFFER_CALLBACK,
       };
 
     case CallState.FALLBACK:
-      await handleFallback(ctx);
+      fallbackHandler(ctx);
       return {
         ...ctx,
-        state: CallState.COMPLETE,
-        resolved: true,
+        state: CallState.OFFER_CALLBACK,
       };
 
     default:
       // hard safety
-      await handleFallback(ctx);
-      return {
-        ...ctx,
-        state: CallState.COMPLETE,
-        resolved: true,
-      };
+      fallbackHandler(ctx);
+      return { ...ctx, state: CallState.END };
   }
 }

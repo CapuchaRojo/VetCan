@@ -3,10 +3,11 @@ import type { Intent } from "./voiceIntents";
 
 export const VOICE_TRANSITIONS = {
   inbound: ["intent"],
-  intent: ["name", "inbound", "complete"],
+  intent: ["name", "inbound", "complete", "general_inquiry"],
   name: ["phone"],
   phone: ["time", "name"],
   time: ["complete", "inbound"],
+  general_inquiry: ["complete"],
   complete: [],
 } as const;
 

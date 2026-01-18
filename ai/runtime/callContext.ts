@@ -5,4 +5,6 @@ export type CallContext = {
   state: CallState;
   lastUserInput?: string;
   attempts?: number;
+  name?: string;
+  phone?: string;
 };

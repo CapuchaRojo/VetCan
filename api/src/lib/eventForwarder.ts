@@ -17,6 +17,7 @@ const EVENT_NAMES: EventName[] = [
   "alert_resolved",
   "alert_acknowledged",
   "callback_marked_staff_handled",
+  "callback_requested",
 ];
 
 export function initEventForwarder() {

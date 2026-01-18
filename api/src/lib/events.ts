@@ -12,7 +12,8 @@ export type EventName =
   | "alert_triggered"
   | "alert_resolved"
   | "alert_acknowledged"
-  | "callback_marked_staff_handled";
+  | "callback_marked_staff_handled"
+  | "callback_requested";
 
 export type EventPayloads = {
   voice_state_transition: { from: string; to: string };
@@ -62,6 +63,12 @@ export type EventPayloads = {
     operatorId?: string;
     operatorName?: string;
     role?: string;
+  };
+  callback_requested: {
+    source: "voice";
+    intent: "general_inquiry";
+    phone: string;
+    name?: string;
   };
 };
 

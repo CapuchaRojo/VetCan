@@ -10,7 +10,6 @@ import {
   normalizePhone,
   validateNameInput,
 } from "../voice/voiceFlow";
-import type { VoicePlan } from "../voice/types";
 import { VOICE_LINES } from "../voice/voiceLines";
 import { pickLine } from "../voice/pickLine";
 import { emitEvent } from "../lib/events";
@@ -21,6 +20,10 @@ import {
   runWithCorrelationId,
   setCorrelationIdForCall,
 } from "../lib/requestContext";
+import {
+  buildGeneralInquiryPlan,
+  isGeneralInquiryState,
+} from "../voice/generalInquiryFlow";
 
 const router = Router();
 const VoiceResponse = twilio.twiml.VoiceResponse;
@@ -54,7 +57,19 @@ router.use((req, _res, next) => {
   return runWithCorrelationId(correlationId, next);
 });
 
-function applyPlan(twiml: twilio.twiml.VoiceResponse, plan: VoicePlan) {
+type TwimlPlan = {
+  say: string[];
+  gather?: {
+    input: Array<"speech" | "dtmf">;
+    action: string;
+    method: "POST";
+    speechTimeout: "auto";
+  };
+  redirect?: string;
+  hangup?: boolean;
+};
+
+function applyPlan(twiml: twilio.twiml.VoiceResponse, plan: TwimlPlan) {
   const sayTarget = plan.gather
     ? twiml.gather(plan.gather)
     : twiml;
@@ -92,6 +107,26 @@ router.post("/voice/intent", (req, res) => {
   const { plan } = buildIntentPlan(speech);
   applyPlan(twiml, plan);
 
+  res.type("text/xml").send(twiml.toString());
+});
+
+/**
+ * POST /api/voice/general-inquiry
+ */
+router.post("/voice/general-inquiry", (req, res) => {
+  const twiml = new VoiceResponse();
+  const rawState = String(req.query.state || "GREETING").trim();
+  const state = isGeneralInquiryState(rawState) ? rawState : "GREETING";
+  const speech = String(req.body.SpeechResult || req.body.Digits || "").trim();
+  const phone = String(req.query.phone || "").trim();
+
+  const plan = buildGeneralInquiryPlan({
+    state,
+    speech,
+    phone,
+  });
+
+  applyPlan(twiml, plan);
   res.type("text/xml").send(twiml.toString());
 });
 

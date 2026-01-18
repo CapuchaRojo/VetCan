@@ -6,6 +6,7 @@ import { emitEvent } from "../lib/events";
 import { validationFail } from "../lib/validationFail";
 import type { VoiceContext, VoicePlan, VoiceState } from "./types";
 import { VOICE_TRANSITIONS } from "./types";
+import { buildGeneralInquiryPlan } from "./generalInquiryFlow";
 
 const LOW_CONFIDENCE_THRESHOLD = 0.4;
 
@@ -84,7 +85,6 @@ export function buildIntentPlan(speech: string): {
   switch (intent) {
     case "callback":
     case "scheduling":
-    case "general_question":
       ensureTransition("intent", "name");
       say.push(pickLine(VOICE_LINES.schedulingConfirm));
       return {
@@ -95,6 +95,22 @@ export function buildIntentPlan(speech: string): {
           redirect: "/api/voice/name",
         },
       };
+
+    case "general_question": {
+      ensureTransition("intent", "general_inquiry");
+      const inquiryPlan = buildGeneralInquiryPlan({
+        state: "LISTENING",
+        speech: trimmed,
+      });
+      return {
+        context,
+        plan: {
+          ...inquiryPlan,
+          say: [...say, ...inquiryPlan.say],
+          nextState: "general_inquiry",
+        },
+      };
+    }
 
     case "operator":
       ensureTransition("intent", "complete");

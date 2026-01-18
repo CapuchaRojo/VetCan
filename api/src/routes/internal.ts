@@ -1,6 +1,6 @@
 import { Router } from "express";
 import prisma from "../prisma";
-import { emitEvent, getRecentEvents } from "../lib/events";
+import { emitEvent, getRecentEvents, recordInternalEvent } from "../lib/events";
 import {
   acknowledgeAlert,
   getActiveAlerts,
@@ -24,12 +24,36 @@ router.get("/status", requireAuth, (_req, res) => {
 router.get("/events/recent", requireAuth, (req, res) => {
   const limit = Number(req.query.limit);
   const safeLimit = Number.isFinite(limit) ? limit : 50;
-  res.json(getRecentEvents(safeLimit));
+  res.json({ events: getRecentEvents(safeLimit) });
 });
 
 router.get("/alerts/active", (_req, res) => {
   res.json(getActiveAlerts());
 });
+
+router.post(
+  "/events/emit",
+  (req, res, next) => {
+    if (process.env.NODE_ENV === "production") {
+      return res.status(404).json({ error: "Route not found" });
+    }
+    return next();
+  },
+  requireAuth,
+  (req, res) => {
+    const type = req.body?.type;
+    if (typeof type !== "string" || !type.trim()) {
+      return res.status(400).json({ error: "Invalid event" });
+    }
+    const payload =
+      req.body?.payload && typeof req.body.payload === "object"
+        ? req.body.payload
+        : {};
+
+    recordInternalEvent(type.trim(), payload);
+    return res.json({ ok: true });
+  }
+);
 
 router.post("/alerts/:id/acknowledge", requireRole("admin"), (req, res) => {
   const { id } = req.params;

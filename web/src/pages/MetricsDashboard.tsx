@@ -5,6 +5,7 @@ import { apiFetch } from "../lib/apiFetch";
 type MetricsResponse = {
   uptimeSeconds: number;
   environment: string;
+  lastUpdated: string;
   eventCounts: Record<string, number>;
   activeAlerts: Array<{
     alertType: string;
@@ -26,13 +27,9 @@ type StatusResponse = {
 };
 
 type RecentEvent = {
-  eventName: string;
-  timestamp: string;
-  correlationId?: string;
-  environment: string;
-  operatorId?: string;
-  operatorName?: string;
-  role?: string;
+  type: string;
+  payload: Record<string, any>;
+  createdAt: string;
 };
 
 export default function MetricsDashboard() {
@@ -111,9 +108,9 @@ export default function MetricsDashboard() {
         if (!res.ok) {
           throw new Error("Recent events request failed");
         }
-        const data: RecentEvent[] = await res.json();
+        const data: { events: RecentEvent[] } = await res.json();
         if (!isMounted) return;
-        setRecentEvents(data);
+        setRecentEvents(data.events || []);
       } catch {
         if (!isMounted) return;
         setRecentEvents([]);
@@ -142,13 +139,13 @@ export default function MetricsDashboard() {
 
   const alertEvents = recentEvents.filter(event =>
     ["alert_triggered", "alert_resolved", "alert_acknowledged"].includes(
-      event.eventName
+      event.type
     )
   );
 
   const auditEvents = recentEvents.filter(event =>
     ["alert_triggered", "alert_resolved", "alert_acknowledged", "callback_marked_staff_handled"].includes(
-      event.eventName
+      event.type
     )
   );
 
@@ -424,18 +421,18 @@ export default function MetricsDashboard() {
                 </thead>
                 <tbody>
                   {alertEvents.map((event, idx) => (
-                    <tr key={`${event.eventName}-${event.timestamp}-${idx}`}>
+                    <tr key={`${event.type}-${event.createdAt}-${idx}`}>
                       <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
-                        {event.eventName}
+                        {event.type}
                       </td>
                       <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
-                        {new Date(event.timestamp).toLocaleString()}
+                        {new Date(event.createdAt).toLocaleString()}
                       </td>
                       <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
-                        {event.environment}
+                        {event.payload?.environment || "local"}
                       </td>
                       <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
-                        {event.correlationId || "Not available"}
+                        {event.payload?.correlationId || "Not available"}
                       </td>
                     </tr>
                   ))}
@@ -472,25 +469,25 @@ export default function MetricsDashboard() {
                 </thead>
                 <tbody>
                   {auditEvents.map((event, idx) => (
-                    <tr key={`${event.eventName}-${event.timestamp}-${idx}`}>
+                    <tr key={`${event.type}-${event.createdAt}-${idx}`}>
                       <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                          <span>{event.eventName}</span>
+                          <span>{event.type}</span>
                           <span style={{ fontSize: "12px", color: "#7b726a" }}>
-                            {event.operatorName
-                              ? `by ${event.operatorName}${event.role ? ` (${event.role})` : ""}`
+                            {event.payload?.operatorName
+                              ? `by ${event.payload.operatorName}${event.payload.role ? ` (${event.payload.role})` : ""}`
                               : "Operator unknown"}
                           </span>
                         </div>
                       </td>
                       <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
-                        {new Date(event.timestamp).toLocaleString()}
+                        {new Date(event.createdAt).toLocaleString()}
                       </td>
                       <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
-                        {event.environment}
+                        {event.payload?.environment || "local"}
                       </td>
                       <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
-                        {event.correlationId || "Not available"}
+                        {event.payload?.correlationId || "Not available"}
                       </td>
                     </tr>
                   ))}

@@ -75,18 +75,43 @@ export type EventPayloads = {
 const emitter = new EventEmitter();
 emitter.setMaxListeners(50);
 
-const eventCounts: Partial<Record<EventName, number>> = {};
+const eventCounts: Record<string, number> = {};
 const recentEvents: Array<{
-  eventName: EventName;
-  timestamp: string;
-  correlationId?: string;
-  environment: string;
-  operatorId?: string;
-  operatorName?: string;
-  role?: string;
+  type: string;
+  payload: unknown;
+  createdAt: string;
 }> = [];
 
-const MAX_RECENT_EVENTS = 200;
+const MAX_RECENT_EVENTS = 50;
+
+function sanitizePayload(payload: unknown) {
+  if (!payload || typeof payload !== "object") return payload;
+  const record = payload as Record<string, unknown>;
+  const redactedKeys = ["phone", "name", "email", "dob", "ssn", "address"];
+  const sanitized: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(record)) {
+    if (redactedKeys.includes(key)) {
+      sanitized[key] = "[redacted]";
+    } else {
+      sanitized[key] = value;
+    }
+  }
+
+  return sanitized;
+}
+
+function recordRecentEvent(type: string, payload: unknown) {
+  recentEvents.push({
+    type,
+    payload: sanitizePayload(payload),
+    createdAt: new Date().toISOString(),
+  });
+
+  if (recentEvents.length > MAX_RECENT_EVENTS) {
+    recentEvents.shift();
+  }
+}
 
 export function emitEvent<E extends EventName>(
   name: E,
@@ -134,19 +159,16 @@ export function emitEvent<E extends EventName>(
     finalPayload = { ...(payload as any), correlationId: resolvedCorrelationId };
   }
 
-  recentEvents.push({
-    eventName: name,
-    timestamp: new Date().toISOString(),
+  recordRecentEvent(name, {
+    ...(typeof finalPayload === "object" && finalPayload !== null
+      ? (finalPayload as Record<string, unknown>)
+      : { value: finalPayload }),
     correlationId: resolvedCorrelationId,
     environment: process.env.NODE_ENV || "local",
     operatorId,
     operatorName,
     role: operatorRole,
   });
-
-  if (recentEvents.length > MAX_RECENT_EVENTS) {
-    recentEvents.shift();
-  }
 
   emitter.emit(name, finalPayload);
 }
@@ -156,6 +178,11 @@ export function onEvent<E extends EventName>(
   listener: (payload: EventPayloads[E]) => void
 ) {
   emitter.on(name, listener);
+}
+
+export function recordInternalEvent(type: string, payload?: unknown) {
+  eventCounts[type] = (eventCounts[type] || 0) + 1;
+  recordRecentEvent(type, payload ?? {});
 }
 
 export function getEventCounts() {

@@ -15,6 +15,7 @@ export type EventName =
   | "alert_triggered"
   | "alert_resolved"
   | "alert_acknowledged"
+  | "alert_escalation_requested"
   | "callback_marked_staff_handled"
   | "callback_requested";
 
@@ -49,6 +50,17 @@ export type EventPayloads = {
     windowSeconds: number;
     environment: string;
     triggeredAt: string;
+    correlationId?: string;
+  };
+  alert_escalation_requested: {
+    alertType: string;
+    eventName: string;
+    environment: string;
+    triggeredAt: string;
+    correlationId?: string;
+    severity: "info" | "warning" | "critical";
+    ageSeconds: number;
+    callSid?: string;
   };
   alert_resolved: {
     alertType: string;
@@ -81,12 +93,17 @@ export type EventPayloads = {
     operatorId?: string;
     operatorName?: string;
     role?: string;
+    callSid?: string;
+    phone?: string;
   };
   callback_requested: {
-    source: "voice";
-    intent: "general_inquiry";
-    phone: string;
+    source: "voice" | "sms";
+    intent?: string;
+    phone?: string;
     name?: string;
+    staffFollowupRequired?: boolean;
+    correlationId?: string;
+    callSid?: string;
   };
 };
 

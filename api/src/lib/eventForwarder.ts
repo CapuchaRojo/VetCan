@@ -4,6 +4,7 @@ import { onEvent, type EventName } from "./events";
 
 let initialized = false;
 let forwarderEnabled = false;
+let n8nWarned = false;
 
 const EVENT_NAMES: EventName[] = [
   "voice_state_transition",
@@ -17,6 +18,7 @@ const EVENT_NAMES: EventName[] = [
   "ai_call_initiated",
   "appointment_create_result",
   "alert_triggered",
+  "alert_escalation_requested",
   "alert_resolved",
   "alert_acknowledged",
   "callback_marked_staff_handled",
@@ -28,6 +30,7 @@ export function initEventForwarder() {
   initialized = true;
 
   const webhookUrl = process.env.EVENT_WEBHOOK_URL;
+  const n8nWebhookUrl = process.env.N8N_ALERT_WEBHOOK_URL;
   if (!webhookUrl) return;
 
   let target: URL;
@@ -91,6 +94,62 @@ export function initEventForwarder() {
   for (const eventName of EVENT_NAMES) {
     onEvent(eventName, (payload) => postEvent(eventName, payload));
   }
+
+  const postN8nEvent = (payload: unknown) => {
+    if (!n8nWebhookUrl) {
+      if (!n8nWarned) {
+        n8nWarned = true;
+        console.warn("[events] N8N_ALERT_WEBHOOK_URL not set; n8n forwarding disabled.");
+      }
+      return;
+    }
+
+    let target: URL;
+    try {
+      target = new URL(n8nWebhookUrl);
+    } catch {
+      if (!n8nWarned) {
+        n8nWarned = true;
+        console.warn("[events] Invalid N8N_ALERT_WEBHOOK_URL; forwarding disabled.");
+      }
+      return;
+    }
+
+    const isHttpsTarget = target.protocol === "https:";
+    const client = isHttpsTarget ? https : http;
+    const port = target.port
+      ? Number(target.port)
+      : isHttpsTarget
+        ? 443
+        : 80;
+    const path = `${target.pathname}${target.search}`;
+    const body = JSON.stringify(payload);
+
+    const req = client.request(
+      {
+        method: "POST",
+        hostname: target.hostname,
+        port,
+        path,
+        headers: {
+          "content-type": "application/json",
+          "content-length": Buffer.byteLength(body),
+        },
+      },
+      (res) => res.resume()
+    );
+
+    req.on("error", () => {
+      console.warn("[events] Failed to forward n8n escalation.");
+    });
+
+    req.write(body);
+    req.end();
+  };
+
+  onEvent("alert_escalation_requested", (payload) => {
+    postN8nEvent(payload);
+  });
 }
 
 export function isEventForwarderEnabled() {

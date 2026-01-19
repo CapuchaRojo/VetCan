@@ -1,4 +1,4 @@
-import { emitEvent, getEventCounts } from "./events";
+import { emitEvent, getEventCounts, onEvent } from "./events";
 
 /**
  * Alert state tracked in-memory
@@ -16,6 +16,9 @@ type AlertState = {
   acknowledgedAt?: string;
   environment: string;
   correlationId?: string;
+  source?: "voice" | "sms";
+  phone?: string;
+  callSid?: string;
 };
 
 /**
@@ -50,6 +53,39 @@ const activeAlerts = new Map<string, AlertState>();
 
 let initialized = false;
 let lastCounts: Record<string, number> | null = null;
+let callbackListenerRegistered = false;
+let callbackResolveListenerRegistered = false;
+
+type AlertSeverity = "info" | "warning" | "critical";
+
+function getAlertAgeSeconds(firstTriggeredAt: string) {
+  return Math.max(
+    0,
+    Math.floor((Date.now() - Date.parse(firstTriggeredAt)) / 1000)
+  );
+}
+
+function getAlertSeverity(ageSeconds: number): AlertSeverity {
+  if (ageSeconds >= 300) return "critical";
+  if (ageSeconds >= 60) return "warning";
+  return "info";
+}
+
+function handleAlertEscalation(alert: AlertState) {
+  const ageSeconds = getAlertAgeSeconds(alert.firstTriggeredAt);
+  const severity = getAlertSeverity(ageSeconds);
+  emitEvent("alert_escalation_requested", {
+    alertType: alert.alertType,
+    eventName: alert.eventName,
+    environment: alert.environment,
+    triggeredAt: alert.firstTriggeredAt,
+    correlationId: alert.correlationId,
+    severity,
+    ageSeconds,
+    callSid: alert.callSid,
+  });
+  // TODO(A5.8.1): wire alert escalation resolution to staff-handled events.
+}
 
 /**
  * Helpers
@@ -84,6 +120,114 @@ function getWindowCount(
 export function initAlertEvaluator() {
   if (initialized) return;
   initialized = true;
+
+  if (!callbackListenerRegistered) {
+    callbackListenerRegistered = true;
+    onEvent("callback_requested", (payload) => {
+      if (!payload || typeof payload !== "object") return;
+      if (!payload?.staffFollowupRequired) return;
+      if (payload.source !== "voice" && payload.source !== "sms") return;
+
+      const correlationId =
+        "correlationId" in payload
+          ? (payload as { correlationId?: string }).correlationId
+          : undefined;
+      const callSid =
+        "callSid" in payload
+          ? (payload as { callSid?: string }).callSid
+          : undefined;
+      const keySuffix = correlationId || callSid || payload.phone || "unknown";
+      const key = `callback_staff_required:${payload.source}:${keySuffix}`;
+
+      if (activeAlerts.has(key)) return;
+
+      const alert: AlertState = {
+        id: key,
+        alertType: "callback_staff_required",
+        eventName: "callback_requested",
+        count: 1,
+        threshold: 1,
+        windowSeconds: 0,
+        firstTriggeredAt: new Date().toISOString(),
+        environment: process.env.NODE_ENV || "local",
+        correlationId,
+        source: payload.source,
+        phone: payload.phone,
+        callSid,
+      };
+
+      activeAlerts.set(key, alert);
+
+      emitEvent("alert_triggered", {
+        alertType: alert.alertType,
+        eventName: alert.eventName,
+        count: alert.count,
+        threshold: alert.threshold,
+        windowSeconds: alert.windowSeconds,
+        environment: alert.environment,
+        triggeredAt: alert.firstTriggeredAt,
+        correlationId: alert.correlationId,
+      });
+
+      handleAlertEscalation(alert);
+    });
+  }
+
+  if (!callbackResolveListenerRegistered) {
+    callbackResolveListenerRegistered = true;
+    onEvent("callback_marked_staff_handled", (payload) => {
+      if (!payload || typeof payload !== "object") return;
+      const correlationId =
+        "correlationId" in payload
+          ? (payload as { correlationId?: string }).correlationId
+          : undefined;
+      const callSid =
+        "callSid" in payload
+          ? (payload as { callSid?: string }).callSid
+          : undefined;
+      const phone =
+        "phone" in payload ? (payload as { phone?: string }).phone : undefined;
+
+      const matches = (alert: AlertState) =>
+        alert.alertType === "callback_staff_required" &&
+        (alert.correlationId === correlationId ||
+          alert.callSid === callSid ||
+          alert.phone === phone);
+
+      for (const [key, alert] of activeAlerts.entries()) {
+        if (!matches(alert)) continue;
+        if (alert.resolvedAt) continue;
+
+        const resolvedAt = new Date().toISOString();
+        const durationSeconds = Math.max(
+          0,
+          Math.floor(
+            (Date.parse(resolvedAt) -
+              Date.parse(alert.firstTriggeredAt)) /
+              1000
+          )
+        );
+
+        alert.resolvedAt = resolvedAt;
+        alert.durationSeconds = durationSeconds;
+
+        emitEvent("alert_resolved", {
+          alertType: alert.alertType,
+          eventName: alert.eventName,
+          count: alert.count,
+          threshold: alert.threshold,
+          windowSeconds: alert.windowSeconds,
+          environment: alert.environment,
+          triggeredAt: alert.firstTriggeredAt,
+          resolvedAt,
+          durationSeconds,
+          correlationId: alert.correlationId,
+        });
+
+        activeAlerts.delete(key);
+      }
+    });
+  }
 
   const windowSeconds = parseWindowSeconds(
     process.env.ALERT_WINDOW_SECONDS
@@ -146,6 +290,7 @@ export function initAlertEvaluator() {
             environment: alert.environment,
             triggeredAt: alert.firstTriggeredAt,
           });
+          handleAlertEscalation(alert);
         } else {
           // Alert still active → update count only
           activeAlerts.get(key)!.count = count;
@@ -193,7 +338,15 @@ export function initAlertEvaluator() {
  * Expose active alerts for metrics/dashboard
  */
 export function getActiveAlerts(): AlertState[] {
-  return Array.from(activeAlerts.values());
+  return Array.from(activeAlerts.values()).map((alert) => {
+    const ageSeconds = getAlertAgeSeconds(alert.firstTriggeredAt);
+    const severity = getAlertSeverity(ageSeconds);
+    return {
+      ...alert,
+      ageSeconds,
+      severity,
+    };
+  });
 }
 
 export function isAlertEvaluatorInitialized() {

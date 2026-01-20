@@ -1,4 +1,5 @@
 import { emitEvent, getEventCounts, onEvent } from "./events";
+import { pushAlertUpdate } from "./alertStream";
 
 /**
  * Alert state tracked in-memory
@@ -86,6 +87,19 @@ function handleAlertEscalation(alert: AlertState) {
     ageSeconds,
     callSid: alert.callSid,
   });
+
+  pushAlertUpdate({
+    type: "alert_escalated",
+    alertType: alert.alertType,
+    eventName: alert.eventName,
+    summary: alert.summary,
+    environment: alert.environment,
+    triggeredAt: alert.firstTriggeredAt,
+    severity,
+    ageSeconds,
+    callSid: alert.callSid,
+  });
+
   // TODO(A5.8.1): wire alert escalation resolution to staff-handled events.
 }
 

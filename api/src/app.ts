@@ -2,6 +2,7 @@ import express from 'express';
 import routes from './routes';
 import alertsRouter from './routes/alerts';
 import { apiLimiter } from './middleware/rateLimit';
+import alertsStreamRouter from "./routes/alertsStream";
 import { requestLogger } from './middleware/requestLogger';
 import {
   notFoundHandler,
@@ -32,6 +33,10 @@ app.get('/health', (_req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+app.use("/api/alerts", alertsRouter);
+
+app.use("/api/alerts", alertsStreamRouter);
 
 // ❌ 404 handler (after routes)
 app.use(notFoundHandler);

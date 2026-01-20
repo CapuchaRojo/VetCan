@@ -94,3 +94,16 @@ model Agent {
   role      String
   createdAt DateTime @default(now())
 }
+
+model Alert {
+  id          String   @id @default(cuid())
+  severity    String
+  alertType   String?
+  eventName   String?
+  environment String?
+  ageSeconds  Int?
+  callSid     String?
+  summary     String
+  triggeredAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+}

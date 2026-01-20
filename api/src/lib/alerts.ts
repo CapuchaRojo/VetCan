@@ -59,7 +59,7 @@ const EVENT_RULES: EventAlertRule[] = [
   {
     eventName: "callback_requested",
     alertType: "callback_staff_required",
-    summary: "Staff callback required",
+    summary: "Callback requires staff follow-up",
     shouldTrigger: (payload) =>
       payload?.staffFollowupRequired === true &&
       (payload?.source === "voice" || payload?.source === "sms"),

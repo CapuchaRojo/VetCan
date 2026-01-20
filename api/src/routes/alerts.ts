@@ -40,16 +40,33 @@ router.post("/", async (req, res) => {
     });
 
     // 🔔 Emit escalation event (typed + normalized)
-    emitEvent("alert_escalation_requested", {
-      severity: alert.severity as "info" | "warning" | "critical",
-      summary: alert.summary,
-      environment: alert.environment ?? "unknown",
-      alertType: alert.alertType ?? undefined,
-      eventName: alert.eventName ?? undefined,
-      ageSeconds: alert.ageSeconds ?? 0,
-      callSid: alert.callSid ?? undefined,
-      triggeredAt: alert.triggeredAt.toISOString(),
-    });
+    // Hard invariants — escalation is terminal
+if (!alert.alertType || !alert.eventName) {
+  throw new Error(
+    `Invariant violation: alert ${alert.id} missing alertType or eventName`
+  );
+}
+
+emitEvent("alert_escalation_requested", {
+  alertType: alert.alertType,
+  eventName: alert.eventName,
+
+  // environment must never be null at escalation time
+  environment: alert.environment ?? process.env.NODE_ENV ?? "development",
+
+  summary: alert.summary,
+
+  // correct field name
+  triggeredAt: alert.triggeredAt.toISOString(),
+
+  // correlation for humans + n8n = alert id
+  correlationId: alert.id,
+
+  severity,
+  ageSeconds,
+
+  callSid: alert.callSid ?? undefined,
+});
 
     res.status(201).json({ ok: true, alert });
   } catch (err) {

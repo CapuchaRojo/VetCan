@@ -53,8 +53,8 @@ export type EventPayloads = {
     correlationId?: string;
   };
   alert_escalation_requested: {
-    alertType?: string;
-    eventName?: string;
+    alertType: string;
+    eventName: string;
     environment: string;
     summary: string;
     triggeredAt: string;

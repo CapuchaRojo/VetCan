@@ -7,6 +7,7 @@ type AlertState = {
   id: string;
   alertType: string;
   eventName: string;
+  summary: string;   
   count: number;
   threshold: number;
   windowSeconds: number;
@@ -77,6 +78,7 @@ function handleAlertEscalation(alert: AlertState) {
   emitEvent("alert_escalation_requested", {
     alertType: alert.alertType,
     eventName: alert.eventName,
+    summary: alert.summary,
     environment: alert.environment,
     triggeredAt: alert.firstTriggeredAt,
     correlationId: alert.correlationId,
@@ -145,6 +147,7 @@ export function initAlertEvaluator() {
         id: key,
         alertType: "callback_staff_required",
         eventName: "callback_requested",
+        summary: "Staff callback required",   // ✅ simple, canonical
         count: 1,
         threshold: 1,
         windowSeconds: 0,
@@ -267,16 +270,17 @@ export function initAlertEvaluator() {
 
       if (count >= rule.threshold) {
         if (!activeAlerts.has(key)) {
-          const alert: AlertState = {
-            id: key,
-            alertType: rule.alertType,
-            eventName: rule.eventName,
-            count,
-            threshold: rule.threshold,
-            windowSeconds,
-            firstTriggeredAt: new Date().toISOString(),
-            environment: process.env.NODE_ENV || "local",
-          };
+         const alert: AlertState = {
+           id: key,
+           alertType: rule.alertType,
+           eventName: rule.eventName,
+           summary: `${rule.eventName} exceeded threshold`,
+           count,
+           threshold: rule.threshold,
+           windowSeconds,
+           firstTriggeredAt: new Date().toISOString(),
+           environment: process.env.NODE_ENV || "local",
+         };
 
           activeAlerts.set(key, alert);
 

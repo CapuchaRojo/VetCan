@@ -105,6 +105,7 @@ export type EventPayloads = {
     staffFollowupRequired?: boolean;
     correlationId?: string;
     callSid?: string;
+    environment?: string;
   };
 };
 

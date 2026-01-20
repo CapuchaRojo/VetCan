@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
 import { apiFetch } from "../lib/apiFetch";
 
 type MetricsResponse = {
@@ -32,14 +31,68 @@ type RecentEvent = {
   createdAt: string;
 };
 
+type FilterMode = "all" | "pending" | "ai" | "staff";
+
+type Callback = {
+  id: string;
+  name: string;
+  phone: string;
+  status: string;
+  source?: string;
+  createdAt: string;
+  aiHandled?: boolean;
+  aiOutcome?: string | null;
+  staffFollowupRequired?: boolean;
+  summary?: string | null;
+};
+
+type ActiveAlert = {
+  id: string;
+  alertType: string;
+  eventName: string;
+  count: number;
+  threshold: number;
+  firstTriggeredAt: string;
+  acknowledgedAt?: string;
+};
+
+const tableHeaderStyle = {
+  padding: "10px",
+  borderBottom: "1px solid #d9d2c7",
+};
+
+const tableCellStyle = {
+  padding: "12px 10px",
+  borderBottom: "1px solid #efe7dd",
+};
+
+function SectionTitle({ children }: { children: string }) {
+  return (
+    <h2 style={{ fontSize: "20px", marginBottom: "12px" }}>
+      {children}
+    </h2>
+  );
+}
+
 export default function MetricsDashboard() {
-  const location = useLocation();
   const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [recentEvents, setRecentEvents] = useState<RecentEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(true);
+  const [metricsError, setMetricsError] = useState<string | null>(null);
+  const [metricsUpdatedAt, setMetricsUpdatedAt] = useState<string | null>(null);
+
+  const [callbacks, setCallbacks] = useState<Callback[]>([]);
+  const [callbacksLoading, setCallbacksLoading] = useState(true);
+  const [callbacksUpdatedAt, setCallbacksUpdatedAt] = useState<Date | null>(null);
+  const [query, setQuery] = useState("");
+  const [filterMode, setFilterMode] = useState<FilterMode>("all");
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [recentlyUpdatedId, setRecentlyUpdatedId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [demoIds, setDemoIds] = useState<Set<string>>(new Set());
+  const [alerts, setAlerts] = useState<ActiveAlert[]>([]);
+  const [alertsError, setAlertsError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -53,14 +106,14 @@ export default function MetricsDashboard() {
         const data: MetricsResponse = await res.json();
         if (!isMounted) return;
         setMetrics(data);
-        setLastUpdated(new Date().toLocaleTimeString());
-        setError(null);
+        setMetricsUpdatedAt(new Date().toLocaleTimeString());
+        setMetricsError(null);
       } catch {
         if (!isMounted) return;
-        setError("Unable to load metrics.");
+        setMetricsError("Unable to load metrics.");
       } finally {
         if (isMounted) {
-          setLoading(false);
+          setMetricsLoading(false);
         }
       }
     };
@@ -126,6 +179,51 @@ export default function MetricsDashboard() {
     };
   }, []);
 
+  useEffect(() => {
+    const fetchCallbacks = async () => {
+      try {
+        const res = await apiFetch("/api/callbacks");
+        const data: Callback[] = await res.json();
+
+        setCallbacks(data);
+
+        if (data.length > 0) {
+          setRecentlyUpdatedId(data[0].id);
+          setTimeout(() => setRecentlyUpdatedId(null), 2000);
+        }
+
+        setCallbacksUpdatedAt(new Date());
+        setCallbacksLoading(false);
+      } catch (err) {
+        console.error("Failed to fetch callbacks", err);
+        setCallbacksLoading(false);
+      }
+    };
+
+    fetchCallbacks();
+    const interval = setInterval(fetchCallbacks, 15000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        const res = await apiFetch("/api/internal/alerts/active");
+        if (!res.ok) throw new Error("Alert fetch failed");
+        const data: ActiveAlert[] = await res.json();
+        setAlerts(data);
+        setAlertsError(null);
+      } catch (err) {
+        setAlertsError("Unable to load alerts.");
+      }
+    };
+
+    fetchAlerts();
+    const interval = setInterval(fetchAlerts, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
   const uptime = metrics?.uptimeSeconds ?? 0;
   const hours = Math.floor(uptime / 3600);
   const minutes = Math.floor((uptime % 3600) / 60);
@@ -149,6 +247,111 @@ export default function MetricsDashboard() {
     )
   );
 
+  const todayCount = callbacks.filter(cb => {
+    const created = new Date(cb.createdAt);
+    const now = new Date();
+    return (
+      created.getFullYear() === now.getFullYear() &&
+      created.getMonth() === now.getMonth() &&
+      created.getDate() === now.getDate()
+    );
+  }).length;
+
+  const completionRate = Math.round(
+    (callbacks.filter(c => c.status === "completed").length /
+      Math.max(callbacks.length, 1)) * 100
+  );
+
+  const pendingCount = callbacks.filter(c => c.status === "pending").length;
+
+  const filteredCallbacks = callbacks
+    .filter(cb =>
+      `${cb.name} ${cb.phone}`.toLowerCase().includes(query.toLowerCase())
+    )
+    .filter(cb => {
+      switch (filterMode) {
+        case "pending":
+          return cb.status === "pending";
+        case "ai":
+          return cb.aiHandled === true;
+        case "staff":
+          return cb.staffFollowupRequired === true;
+        default:
+          return true;
+      }
+    });
+
+  async function attemptAiCallback(id: string) {
+    try {
+      setLoadingId(id);
+
+      const res = await apiFetch(
+        `/api/callbacks/${id}/ai-call?demo=true`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            demo: true,
+            simulatedMedicalQuestion: false,
+          }),
+        }
+      );
+
+      const data = await res.json();
+      if (!res.ok) throw new Error("AI callback failed");
+
+      if (data.demo && data.callback) {
+        setCallbacks(prev =>
+          prev.map(cb => (cb.id === id ? data.callback : cb))
+        );
+
+        setDemoIds(prev => new Set(prev).add(id));
+
+        setToast("Demo AI callback executed (no data saved)");
+        setTimeout(() => setToast(null), 3000);
+        return;
+      }
+
+      const updated = await apiFetch("/api/callbacks").then(r => r.json());
+      setCallbacks(updated);
+    } catch (err) {
+      console.error("AI callback error", err);
+      alert("AI callback attempt failed");
+    } finally {
+      setLoadingId(null);
+    }
+  }
+
+  async function acknowledgeAlert(id: string) {
+    try {
+      const res = await apiFetch(`/api/internal/alerts/${id}/acknowledge`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Acknowledge failed");
+      setAlerts(prev =>
+        prev.map(alert =>
+          alert.id === id ? { ...alert, acknowledgedAt: new Date().toISOString() } : alert
+        )
+      );
+    } catch (err) {
+      console.error("Alert acknowledge error", err);
+      setAlertsError("Unable to acknowledge alert.");
+    }
+  }
+
+  async function markStaffHandled(id: string) {
+    try {
+      const res = await apiFetch(`/api/internal/callbacks/${id}/mark-staff-handled`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Mark handled failed");
+      const updated = await apiFetch("/api/callbacks").then(r => r.json());
+      setCallbacks(updated);
+    } catch (err) {
+      console.error("Mark staff handled error", err);
+    }
+  }
+
   return (
     <div
       style={{
@@ -160,6 +363,24 @@ export default function MetricsDashboard() {
         padding: "32px",
       }}
     >
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            top: "20px",
+            right: "20px",
+            background: "#4338ca",
+            color: "#ffffff",
+            padding: "10px 14px",
+            borderRadius: "10px",
+            boxShadow: "0 12px 24px rgba(24, 28, 34, 0.2)",
+            fontSize: "14px",
+            zIndex: 10,
+          }}
+        >
+          {toast}
+        </div>
+      )}
       <main
         style={{
           maxWidth: "1100px",
@@ -171,57 +392,6 @@ export default function MetricsDashboard() {
           border: "1px solid rgba(28, 28, 28, 0.08)",
         }}
       >
-        <nav
-          style={{
-            display: "flex",
-            gap: "12px",
-            marginBottom: "20px",
-            fontSize: "14px",
-          }}
-        >
-          <Link
-            to="/"
-            style={{
-              padding: "6px 12px",
-              borderRadius: "999px",
-              textDecoration: "none",
-              color: location.pathname === "/" ? "#ffffff" : "#5a524b",
-              background: location.pathname === "/" ? "#1b1b1b" : "transparent",
-              border: "1px solid rgba(28, 28, 28, 0.12)",
-            }}
-          >
-            Dashboard
-          </Link>
-          <Link
-            to="/metrics"
-            style={{
-              padding: "6px 12px",
-              borderRadius: "999px",
-              textDecoration: "none",
-              color: location.pathname === "/metrics" ? "#ffffff" : "#5a524b",
-              background: location.pathname === "/metrics" ? "#1b1b1b" : "transparent",
-              border: "1px solid rgba(28, 28, 28, 0.12)",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
-            Metrics
-            {activeAlertCount > 0 && (
-              <span
-                style={{
-                  padding: "2px 8px",
-                  borderRadius: "999px",
-                  fontSize: "12px",
-                  background: "#b42318",
-                  color: "#ffffff",
-                }}
-              >
-                {activeAlertCount}
-              </span>
-            )}
-          </Link>
-        </nav>
         <header
           style={{
             display: "flex",
@@ -242,7 +412,7 @@ export default function MetricsDashboard() {
               VetCan Ops Console
             </p>
             <h1 style={{ fontSize: "30px", margin: "8px 0 6px" }}>
-              Internal Metrics
+              Unified Operations Dashboard
             </h1>
             <p style={{ margin: 0, color: "#5a524b" }}>
               Environment: <strong>{metrics?.environment || "local"}</strong>
@@ -256,40 +426,316 @@ export default function MetricsDashboard() {
               {uptimeLabel}
             </p>
             <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#7b726a" }}>
-              Last updated {lastUpdated || "Not updated yet"}
+              Metrics updated {metricsUpdatedAt || "Not updated yet"}
             </p>
           </div>
         </header>
 
         <section style={{ marginTop: "28px" }}>
-          <h2 style={{ fontSize: "20px", marginBottom: "12px" }}>
-            Active Alerts Snapshot
-          </h2>
-          {loading && <p style={{ color: "#7b726a" }}>Loading metrics...</p>}
-          {error && <p style={{ color: "#a23e3e" }}>{error}</p>}
-          {!loading && !error && (
+          <SectionTitle>Operations Summary</SectionTitle>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "12px",
+            }}
+          >
+            <article
+              style={{
+                padding: "14px 16px",
+                borderRadius: "14px",
+                background: "#f9f4ee",
+                border: "1px solid #e4dbd0",
+              }}
+            >
+              <p style={{ margin: 0, fontSize: "12px", color: "#7b726a" }}>
+                Callbacks Today
+              </p>
+              <p style={{ margin: "8px 0 0", fontSize: "22px" }}>
+                {todayCount}
+              </p>
+            </article>
+            <article
+              style={{
+                padding: "14px 16px",
+                borderRadius: "14px",
+                background: "#f9f4ee",
+                border: "1px solid #e4dbd0",
+              }}
+            >
+              <p style={{ margin: 0, fontSize: "12px", color: "#7b726a" }}>
+                Completion Rate
+              </p>
+              <p style={{ margin: "8px 0 0", fontSize: "22px" }}>
+                {completionRate}%
+              </p>
+            </article>
+            <article
+              style={{
+                padding: "14px 16px",
+                borderRadius: "14px",
+                background: "#f9f4ee",
+                border: "1px solid #e4dbd0",
+              }}
+            >
+              <p style={{ margin: 0, fontSize: "12px", color: "#7b726a" }}>
+                Pending Requests
+              </p>
+              <p style={{ margin: "8px 0 0", fontSize: "22px" }}>
+                {pendingCount}
+              </p>
+            </article>
+            <article
+              style={{
+                padding: "14px 16px",
+                borderRadius: "14px",
+                background: "#f9f4ee",
+                border: "1px solid #e4dbd0",
+              }}
+            >
+              <p style={{ margin: 0, fontSize: "12px", color: "#7b726a" }}>
+                Active Alerts
+              </p>
+              <p style={{ margin: "8px 0 0", fontSize: "22px" }}>
+                {activeAlertCount}
+              </p>
+            </article>
+          </div>
+          {callbacksUpdatedAt && (
+            <p style={{ marginTop: "10px", fontSize: "12px", color: "#7b726a" }}>
+              Callbacks updated {callbacksUpdatedAt.toLocaleTimeString()}
+            </p>
+          )}
+        </section>
+
+        <section style={{ marginTop: "28px" }}>
+          <SectionTitle>Actionable Alerts</SectionTitle>
+          {alertsError && <p style={{ color: "#a23e3e" }}>{alertsError}</p>}
+          {alerts.length === 0 ? (
+            <p style={{ color: "#7b726a" }}>No active alerts. System is stable.</p>
+          ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ textAlign: "left", background: "#f0ebe4" }}>
-                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
-                      Alert
-                    </th>
-                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
-                      Event
-                    </th>
-                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
-                      Count
-                    </th>
-                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
-                      Threshold
-                    </th>
-                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
-                      Window
-                    </th>
-                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
-                      Triggered
-                    </th>
+                    <th style={tableHeaderStyle}>ID</th>
+                    <th style={tableHeaderStyle}>Alert</th>
+                    <th style={tableHeaderStyle}>Event</th>
+                    <th style={tableHeaderStyle}>Count</th>
+                    <th style={tableHeaderStyle}>Threshold</th>
+                    <th style={tableHeaderStyle}>Triggered</th>
+                    <th style={tableHeaderStyle}>Acknowledged</th>
+                    <th style={tableHeaderStyle}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {alerts.map(alert => (
+                    <tr key={alert.id}>
+                      <td style={tableCellStyle}>{alert.id}</td>
+                      <td style={tableCellStyle}>{alert.alertType}</td>
+                      <td style={tableCellStyle}>{alert.eventName}</td>
+                      <td style={tableCellStyle}>{alert.count}</td>
+                      <td style={tableCellStyle}>{alert.threshold}</td>
+                      <td style={tableCellStyle}>
+                        {new Date(alert.firstTriggeredAt).toLocaleString()}
+                      </td>
+                      <td style={tableCellStyle}>
+                        {alert.acknowledgedAt
+                          ? new Date(alert.acknowledgedAt).toLocaleString()
+                          : "Not acknowledged"}
+                      </td>
+                      <td style={tableCellStyle}>
+                        {alert.acknowledgedAt ? (
+                          "Acknowledged"
+                        ) : (
+                          <button
+                            onClick={() => acknowledgeAlert(alert.id)}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: "8px",
+                              border: "1px solid #c7beb4",
+                              background: "#ffffff",
+                              cursor: "pointer",
+                              fontSize: "12px",
+                            }}
+                          >
+                            Acknowledge Alert
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section style={{ marginTop: "28px" }}>
+          <SectionTitle>Callback Requests</SectionTitle>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "8px",
+              marginBottom: "12px",
+            }}
+          >
+            {[
+              { key: "all", label: "All" },
+              { key: "pending", label: "Pending" },
+              { key: "ai", label: "AI Handled" },
+              { key: "staff", label: "Needs Staff" },
+            ].map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setFilterMode(tab.key as FilterMode)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: "999px",
+                  border: "1px solid #c7beb4",
+                  background: filterMode === tab.key ? "#1b1b1b" : "#ffffff",
+                  color: filterMode === tab.key ? "#ffffff" : "#5a524b",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <input
+            type="text"
+            placeholder="Search by name or phone"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            style={{
+              marginBottom: "14px",
+              width: "100%",
+              maxWidth: "320px",
+              borderRadius: "10px",
+              border: "1px solid #d9d2c7",
+              padding: "8px 12px",
+            }}
+          />
+          {callbacksLoading ? (
+            <p style={{ color: "#7b726a" }}>Loading callbacks…</p>
+          ) : filteredCallbacks.length === 0 ? (
+            <p style={{ color: "#7b726a" }}>No callback requests yet.</p>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ textAlign: "left", background: "#f0ebe4" }}>
+                    <th style={tableHeaderStyle}>Name</th>
+                    <th style={tableHeaderStyle}>Phone</th>
+                    <th style={tableHeaderStyle}>Status</th>
+                    <th style={tableHeaderStyle}>AI</th>
+                    <th style={tableHeaderStyle}>Staff</th>
+                    <th style={tableHeaderStyle}>Summary</th>
+                    <th style={tableHeaderStyle}>Created</th>
+                    <th style={tableHeaderStyle}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCallbacks.map(cb => (
+                    <tr
+                      key={cb.id}
+                      style={{
+                        background: cb.id === recentlyUpdatedId ? "#fff7d6" : "transparent",
+                      }}
+                    >
+                      <td style={tableCellStyle}>{cb.name}</td>
+                      <td style={tableCellStyle}>{cb.phone}</td>
+                      <td style={tableCellStyle}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span>{cb.status}</span>
+                          {demoIds.has(cb.id) && (
+                            <span
+                              style={{
+                                fontSize: "11px",
+                                padding: "2px 6px",
+                                borderRadius: "999px",
+                                background: "#e0e7ff",
+                                color: "#4338ca",
+                              }}
+                            >
+                              DEMO
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td style={tableCellStyle}>
+                        {cb.aiHandled ? "AI" : "Not handled"}
+                      </td>
+                      <td style={tableCellStyle}>
+                        {cb.staffFollowupRequired ? "Needs staff" : "None"}
+                      </td>
+                      <td style={tableCellStyle}>{cb.summary ?? "No summary"}</td>
+                      <td style={tableCellStyle}>
+                        {new Date(cb.createdAt).toLocaleString()}
+                      </td>
+                      <td style={tableCellStyle}>
+                        {cb.status === "pending" && (
+                          <button
+                            onClick={() => attemptAiCallback(cb.id)}
+                            disabled={loadingId === cb.id}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: "8px",
+                              border: "1px solid #4338ca",
+                              background: "#4338ca",
+                              color: "#ffffff",
+                              cursor: "pointer",
+                              fontSize: "12px",
+                              marginRight: "8px",
+                            }}
+                          >
+                            {loadingId === cb.id ? "Calling AI…" : "Attempt AI Callback"}
+                          </button>
+                        )}
+                        {(cb.staffFollowupRequired || cb.status === "needs_staff") && (
+                          <button
+                            onClick={() => markStaffHandled(cb.id)}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: "8px",
+                              border: "1px solid #c7beb4",
+                              background: "#ffffff",
+                              cursor: "pointer",
+                              fontSize: "12px",
+                            }}
+                          >
+                            Mark Staff Handled
+                          </button>
+                        )}
+                        {cb.status !== "pending" &&
+                          !cb.staffFollowupRequired &&
+                          cb.status !== "needs_staff" && "No action"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section style={{ marginTop: "28px" }}>
+          <SectionTitle>Active Alerts Snapshot</SectionTitle>
+          {metricsLoading && <p style={{ color: "#7b726a" }}>Loading metrics...</p>}
+          {metricsError && <p style={{ color: "#a23e3e" }}>{metricsError}</p>}
+          {!metricsLoading && !metricsError && (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ textAlign: "left", background: "#f0ebe4" }}>
+                    <th style={tableHeaderStyle}>Alert</th>
+                    <th style={tableHeaderStyle}>Event</th>
+                    <th style={tableHeaderStyle}>Count</th>
+                    <th style={tableHeaderStyle}>Threshold</th>
+                    <th style={tableHeaderStyle}>Window</th>
+                    <th style={tableHeaderStyle}>Triggered</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -305,22 +751,12 @@ export default function MetricsDashboard() {
                   )}
                   {(metrics?.activeAlerts || []).map((alert) => (
                     <tr key={`${alert.alertType}-${alert.eventName}`}>
-                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
-                        {alert.alertType}
-                      </td>
-                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
-                        {alert.eventName}
-                      </td>
-                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
-                        {alert.count}
-                      </td>
-                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
-                        {alert.threshold}
-                      </td>
-                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
-                        {alert.windowSeconds}s
-                      </td>
-                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
+                      <td style={tableCellStyle}>{alert.alertType}</td>
+                      <td style={tableCellStyle}>{alert.eventName}</td>
+                      <td style={tableCellStyle}>{alert.count}</td>
+                      <td style={tableCellStyle}>{alert.threshold}</td>
+                      <td style={tableCellStyle}>{alert.windowSeconds}s</td>
+                      <td style={tableCellStyle}>
                         {new Date(alert.triggeredAt).toLocaleString()}
                       </td>
                     </tr>
@@ -332,9 +768,7 @@ export default function MetricsDashboard() {
         </section>
 
         <section style={{ marginTop: "28px" }}>
-          <h2 style={{ fontSize: "20px", marginBottom: "12px" }}>
-            System Status
-          </h2>
+          <SectionTitle>System Status</SectionTitle>
           {!status ? (
             <p style={{ color: "#7b726a" }}>Status unavailable.</p>
           ) : (
@@ -395,9 +829,7 @@ export default function MetricsDashboard() {
         </section>
 
         <section style={{ marginTop: "28px" }}>
-          <h2 style={{ fontSize: "20px", marginBottom: "12px" }}>
-            Recent Alert Activity
-          </h2>
+          <SectionTitle>Recent Alert Activity</SectionTitle>
           {alertEvents.length === 0 ? (
             <p style={{ color: "#7b726a" }}>No recent alert activity.</p>
           ) : (
@@ -405,33 +837,23 @@ export default function MetricsDashboard() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ textAlign: "left", background: "#f0ebe4" }}>
-                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
-                      Event
-                    </th>
-                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
-                      Timestamp
-                    </th>
-                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
-                      Environment
-                    </th>
-                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
-                      Correlation
-                    </th>
+                    <th style={tableHeaderStyle}>Event</th>
+                    <th style={tableHeaderStyle}>Timestamp</th>
+                    <th style={tableHeaderStyle}>Environment</th>
+                    <th style={tableHeaderStyle}>Correlation</th>
                   </tr>
                 </thead>
                 <tbody>
                   {alertEvents.map((event, idx) => (
                     <tr key={`${event.type}-${event.createdAt}-${idx}`}>
-                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
-                        {event.type}
-                      </td>
-                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
+                      <td style={tableCellStyle}>{event.type}</td>
+                      <td style={tableCellStyle}>
                         {new Date(event.createdAt).toLocaleString()}
                       </td>
-                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
+                      <td style={tableCellStyle}>
                         {event.payload?.environment || "local"}
                       </td>
-                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
+                      <td style={tableCellStyle}>
                         {event.payload?.correlationId || "Not available"}
                       </td>
                     </tr>
@@ -443,9 +865,7 @@ export default function MetricsDashboard() {
         </section>
 
         <section style={{ marginTop: "28px" }}>
-          <h2 style={{ fontSize: "20px", marginBottom: "12px" }}>
-            Operator Audit Timeline
-          </h2>
+          <SectionTitle>Operator Audit Timeline</SectionTitle>
           {auditEvents.length === 0 ? (
             <p style={{ color: "#7b726a" }}>No recent operator activity.</p>
           ) : (
@@ -453,24 +873,16 @@ export default function MetricsDashboard() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ textAlign: "left", background: "#f0ebe4" }}>
-                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
-                      Event
-                    </th>
-                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
-                      Timestamp
-                    </th>
-                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
-                      Environment
-                    </th>
-                    <th style={{ padding: "10px", borderBottom: "1px solid #d9d2c7" }}>
-                      Correlation
-                    </th>
+                    <th style={tableHeaderStyle}>Event</th>
+                    <th style={tableHeaderStyle}>Timestamp</th>
+                    <th style={tableHeaderStyle}>Environment</th>
+                    <th style={tableHeaderStyle}>Correlation</th>
                   </tr>
                 </thead>
                 <tbody>
                   {auditEvents.map((event, idx) => (
                     <tr key={`${event.type}-${event.createdAt}-${idx}`}>
-                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
+                      <td style={tableCellStyle}>
                         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                           <span>{event.type}</span>
                           <span style={{ fontSize: "12px", color: "#7b726a" }}>
@@ -480,13 +892,13 @@ export default function MetricsDashboard() {
                           </span>
                         </div>
                       </td>
-                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
+                      <td style={tableCellStyle}>
                         {new Date(event.createdAt).toLocaleString()}
                       </td>
-                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
+                      <td style={tableCellStyle}>
                         {event.payload?.environment || "local"}
                       </td>
-                      <td style={{ padding: "12px 10px", borderBottom: "1px solid #efe7dd" }}>
+                      <td style={tableCellStyle}>
                         {event.payload?.correlationId || "Not available"}
                       </td>
                     </tr>
@@ -498,10 +910,8 @@ export default function MetricsDashboard() {
         </section>
 
         <section style={{ marginTop: "28px" }}>
-          <h2 style={{ fontSize: "20px", marginBottom: "12px" }}>
-            Event Counts
-          </h2>
-          {!loading && !error && (
+          <SectionTitle>Event Counts</SectionTitle>
+          {!metricsLoading && !metricsError && (
             <div
               style={{
                 display: "grid",

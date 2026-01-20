@@ -71,6 +71,7 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "phone is invalid" });
     }
 
+    const staffFollowupRequired = req.body?.staffFollowupRequired === true;
     const callback = await prisma.callbackRequest.create({
       data: {
         name: String(name).trim(),
@@ -78,7 +79,21 @@ router.post("/", async (req, res) => {
         preferredTime: preferredTime ? String(preferredTime).trim() : null,
         requestType: normalizedRequestType,
         status: "pending",
+        staffFollowupRequired,
       },
+    });
+
+    const source =
+      callback.source === "voice" || callback.source === "sms"
+        ? callback.source
+        : "sms";
+
+    emitEvent("callback_requested", {
+      source,
+      phone: callback.phone,
+      staffFollowupRequired: callback.staffFollowupRequired,
+      correlationId: callback.id,
+      environment: process.env.NODE_ENV || "development",
     });
 
     // best-effort notification

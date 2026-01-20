@@ -32,6 +32,13 @@ type ThresholdRule = {
   alertType: string;
 };
 
+type EventAlertRule = {
+  eventName: "callback_requested";
+  alertType: "callback_staff_required";
+  summary: string;
+  shouldTrigger: (payload: any) => boolean;
+};
+
 /**
  * Configurable alert rules
  */
@@ -45,6 +52,17 @@ const RULES: ThresholdRule[] = [
     envKey: "ALERT_CALLBACK_FAILURE_THRESHOLD",
     eventName: "callback_create_failed",
     alertType: "callback_failure_spike",
+  },
+];
+
+const EVENT_RULES: EventAlertRule[] = [
+  {
+    eventName: "callback_requested",
+    alertType: "callback_staff_required",
+    summary: "Staff callback required",
+    shouldTrigger: (payload) =>
+      payload?.staffFollowupRequired === true &&
+      (payload?.source === "voice" || payload?.source === "sms"),
   },
 ];
 
@@ -139,55 +157,57 @@ export function initAlertEvaluator() {
 
   if (!callbackListenerRegistered) {
     callbackListenerRegistered = true;
-    onEvent("callback_requested", (payload) => {
-      if (!payload || typeof payload !== "object") return;
-      if (!payload?.staffFollowupRequired) return;
-      if (payload.source !== "voice" && payload.source !== "sms") return;
+    for (const rule of EVENT_RULES) {
+      onEvent(rule.eventName, (payload) => {
+        if (!payload || typeof payload !== "object") return;
+        if (!rule.shouldTrigger(payload)) return;
 
-      const correlationId =
-        "correlationId" in payload
-          ? (payload as { correlationId?: string }).correlationId
-          : undefined;
-      const callSid =
-        "callSid" in payload
-          ? (payload as { callSid?: string }).callSid
-          : undefined;
-      const keySuffix = correlationId || callSid || payload.phone || "unknown";
-      const key = `callback_staff_required:${payload.source}:${keySuffix}`;
+        const correlationId =
+          "correlationId" in payload
+            ? (payload as { correlationId?: string }).correlationId
+            : undefined;
+        const callSid =
+          "callSid" in payload
+            ? (payload as { callSid?: string }).callSid
+            : undefined;
+        const keySuffix = correlationId || callSid || payload.phone || "unknown";
+        const key = `${rule.alertType}:${payload.source}:${keySuffix}`;
 
-      if (activeAlerts.has(key)) return;
+        if (activeAlerts.has(key)) return;
 
-      const alert: AlertState = {
-        id: key,
-        alertType: "callback_staff_required",
-        eventName: "callback_requested",
-        summary: "Staff callback required",   // ✅ simple, canonical
-        count: 1,
-        threshold: 1,
-        windowSeconds: 0,
-        firstTriggeredAt: new Date().toISOString(),
-        environment: process.env.NODE_ENV || "local",
-        correlationId,
-        source: payload.source,
-        phone: payload.phone,
-        callSid,
-      };
+        const alert: AlertState = {
+          id: key,
+          alertType: rule.alertType,
+          eventName: rule.eventName,
+          summary: rule.summary,
+          count: 1,
+          threshold: 1,
+          windowSeconds: 0,
+          firstTriggeredAt: new Date().toISOString(),
+          environment: process.env.NODE_ENV || "local",
+          correlationId,
+          source: payload.source,
+          phone: payload.phone,
+          callSid,
+        };
 
-      activeAlerts.set(key, alert);
+        activeAlerts.set(key, alert);
+        console.debug("[alerts] triggered", alert.alertType);
 
-      emitEvent("alert_triggered", {
-        alertType: alert.alertType,
-        eventName: alert.eventName,
-        count: alert.count,
-        threshold: alert.threshold,
-        windowSeconds: alert.windowSeconds,
-        environment: alert.environment,
-        triggeredAt: alert.firstTriggeredAt,
-        correlationId: alert.correlationId,
+        emitEvent("alert_triggered", {
+          alertType: alert.alertType,
+          eventName: alert.eventName,
+          count: alert.count,
+          threshold: alert.threshold,
+          windowSeconds: alert.windowSeconds,
+          environment: alert.environment,
+          triggeredAt: alert.firstTriggeredAt,
+          correlationId: alert.correlationId,
+        });
+
+        handleAlertEscalation(alert);
       });
-
-      handleAlertEscalation(alert);
-    });
+    }
   }
 
   if (!callbackResolveListenerRegistered) {

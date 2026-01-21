@@ -74,14 +74,14 @@ model CallbackRequest {
   status        String
   source        String   @default("sms")
 
-// Phase 4 fields (NON-PHI)
-  aiHandled            Boolean   @default(false)
-  aiOutcome            String?   // "reached" | "voicemail" | "no_answer" | "failed"
+  // Phase 4 fields (NON-PHI)
+  aiHandled             Boolean   @default(false)
+  aiOutcome             String?   // "reached" | "voicemail" | "no_answer" | "failed"
   lastAttemptAt         DateTime?
-  confirmedName        String?
-  nonMedicalReason     String?
-  staffFollowupRequired Boolean  @default(false)
-  summary              String?
+  confirmedName         String?
+  nonMedicalReason      String?
+  staffFollowupRequired Boolean   @default(false)
+  summary               String?
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -107,3 +107,47 @@ model Alert {
   triggeredAt DateTime @default(now())
   createdAt   DateTime @default(now())
 }
+
+// ===========================
+// Operational Events & Alerts
+// ===========================
+
+model OperationalEvent {
+  id            String   @id @default(cuid())
+  eventName     String
+  severity      String?  // "info" | "warning" | "critical"
+  source        String?
+  correlationId String?
+  environment   String
+
+  // JSON stringified payload (SQLite-compatible)
+  payload       String
+
+  createdAt     DateTime @default(now())
+
+  escalations   EscalationDelivery[]
+
+  @@index([correlationId])
+}
+
+model EscalationDelivery {
+  id            String   @id @default(cuid())
+  eventId       String
+  event         OperationalEvent @relation(fields: [eventId], references: [id])
+
+  // Unique per delivery target + event
+  dedupeKey     String   @unique
+
+  // "pending" | "sent" | "failed"
+  status        String   @default("pending")
+
+  attemptCount  Int      @default(0)
+  lastAttemptAt DateTime?
+  lastError     String?
+
+  createdAt     DateTime @default(now())
+  sentAt        DateTime?
+
+  @@index([status, lastAttemptAt])
+}
+

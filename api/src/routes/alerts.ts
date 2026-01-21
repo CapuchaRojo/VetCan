@@ -2,6 +2,7 @@ import { Router } from "express";
 import prisma from "../prisma";
 import { emitEvent } from "../lib/events";
 import { logger } from "../utils/logger";
+import requireAuth from "../middleware/auth";
 
 const router = Router();
 
@@ -73,6 +74,54 @@ emitEvent("alert_escalation_requested", {
   } catch (err) {
     logger.error("[alerts POST]", err);
     res.status(500).json({ error: "Failed to create alert" });
+  }
+});
+
+router.post("/:id/ack", requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const operator = (req as any).operator;
+
+  try {
+    const existing = await prisma.alert.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: "Alert not found" });
+    }
+
+    const acknowledgedAt = new Date();
+    await prisma.alert.update({
+      where: { id },
+      data: {
+        acknowledgedAt,
+        acknowledgedBy: operator?.name ?? operator?.id ?? "unknown",
+      },
+    });
+
+    await prisma.escalationDelivery.updateMany({
+      where: {
+        status: { in: ["pending", "failed"] },
+        event: {
+          correlationId: id,
+        },
+      },
+      data: { status: "canceled" },
+    });
+
+    emitEvent("alert_acknowledged", {
+      alertId: id,
+      alertType: existing.alertType ?? "unknown",
+      eventName: existing.eventName ?? "unknown",
+      environment: existing.environment ?? process.env.NODE_ENV ?? "local",
+      acknowledgedAt: acknowledgedAt.toISOString(),
+      correlationId: id,
+      operatorId: operator?.id,
+      operatorName: operator?.name,
+      role: operator?.role,
+    });
+
+    return res.json({ ok: true });
+  } catch (err) {
+    logger.error("[alerts ACK]", err);
+    return res.status(500).json({ error: "Failed to acknowledge alert" });
   }
 });
 

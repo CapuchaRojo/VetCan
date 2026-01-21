@@ -104,6 +104,8 @@ model Alert {
   ageSeconds  Int?
   callSid     String?
   summary     String
+  acknowledgedAt DateTime?
+  acknowledgedBy String?
   triggeredAt DateTime @default(now())
   createdAt   DateTime @default(now())
 }
@@ -150,4 +152,3 @@ model EscalationDelivery {
 
   @@index([status, lastAttemptAt])
 }
-

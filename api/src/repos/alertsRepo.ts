@@ -2,6 +2,9 @@ import prisma from "../prisma";
 
 export async function getAlertSnapshots() {
   const rows = await prisma.alert.findMany({
+    where: {
+      acknowledgedAt: null,
+    },
     orderBy: { createdAt: "desc" },
   });
 

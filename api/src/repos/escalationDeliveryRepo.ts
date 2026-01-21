@@ -6,3 +6,14 @@ export async function createEscalationDelivery(
 ) {
   return prisma.escalationDelivery.create({ data });
 }
+
+export async function upsertEscalationDelivery(
+  dedupeKey: string,
+  createData: Prisma.EscalationDeliveryCreateInput
+) {
+  return prisma.escalationDelivery.upsert({
+    where: { dedupeKey },
+    create: createData,
+    update: {},
+  });
+}

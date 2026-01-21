@@ -1,13 +1,15 @@
 import { Router } from "express";
 import { getEventCounts } from "../lib/events";
 import { getActiveAlerts } from "../lib/alerts";
+import { getOperationalEventCounts } from "../repos/operationalEventsRepo";
+import { getAlertSnapshots } from "../repos/alertsRepo";
 import requireAuth from "../middleware/auth";
 
 const router = Router();
 
 router.use(requireAuth);
 
-router.get("/", (_req, res) => {
+router.get("/", async (_req, res) => {
   // Read-only operational metrics; no request data or payloads exposed.
   try {
     const defaultCounts = {
@@ -16,16 +18,25 @@ router.get("/", (_req, res) => {
       sms_received: 0,
       voice_call_started: 0,
     };
+    const [dbCounts, dbAlerts] = await Promise.all([
+      getOperationalEventCounts(),
+      getAlertSnapshots(),
+    ]);
+
     const eventCounts = {
       ...defaultCounts,
-      ...getEventCounts(),
+      ...(dbCounts || getEventCounts()),
     };
+
+    const activeAlerts =
+      dbAlerts && dbAlerts.length > 0 ? dbAlerts : getActiveAlerts();
+
     res.json({
       uptimeSeconds: Math.floor(process.uptime()),
       environment: process.env.NODE_ENV || "local",
       lastUpdated: new Date().toISOString(),
       eventCounts,
-      activeAlerts: getActiveAlerts(),
+      activeAlerts,
       status: "ok",
     });
   } catch {

@@ -1,5 +1,7 @@
 import { EventEmitter } from "node:events";
 import { getCorrelationId } from "./requestContext";
+import { createOperationalEvent } from "../repos/operationalEventsRepo";
+import { upsertEscalationDelivery } from "../repos/escalationDeliveryRepo";
 
 export type EventName =
   | "voice_state_transition"
@@ -150,6 +152,55 @@ function recordRecentEvent(type: string, payload: unknown) {
   }
 }
 
+function safeStringify(value: unknown) {
+  try {
+    return JSON.stringify(value ?? {});
+  } catch {
+    return "{}";
+  }
+}
+
+async function persistOperationalEvent(
+  name: EventName,
+  payload: EventPayloads[EventName]
+) {
+  const record = payload as Record<string, unknown>;
+  const severity =
+    typeof record?.severity === "string" ? record.severity : null;
+  const source =
+    typeof record?.source === "string" ? record.source : null;
+  const correlationId =
+    typeof record?.correlationId === "string" ? record.correlationId : null;
+  const environment =
+    typeof record?.environment === "string"
+      ? record.environment
+      : process.env.NODE_ENV || "local";
+
+  const event = await createOperationalEvent({
+    eventName: name,
+    severity,
+    source,
+    correlationId,
+    environment,
+    payload: safeStringify(record ?? {}),
+  });
+
+  if (name !== "alert_escalation_requested") return;
+
+  if (!correlationId) {
+    console.warn("[events] Missing correlationId; escalation delivery skipped.");
+    return;
+  }
+
+  const dedupeKey = `${name}:${correlationId}:${severity || "none"}`;
+  await upsertEscalationDelivery(dedupeKey, {
+    event: { connect: { id: event.id } },
+    dedupeKey,
+    status: "pending",
+    attemptCount: 0,
+  });
+}
+
 export function emitEvent<E extends EventName>(
   name: E,
   payload: EventPayloads[E]
@@ -208,6 +259,10 @@ export function emitEvent<E extends EventName>(
   });
 
   emitter.emit(name, finalPayload);
+
+  void persistOperationalEvent(name, finalPayload).catch((err) => {
+    console.warn("[events] Failed to persist operational event.", err);
+  });
 }
 
 export function onEvent<E extends EventName>(

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import prisma from "../prisma";
 import { emitEvent, getRecentEvents, recordInternalEvent } from "../lib/events";
+import { getRecentOperationalEvents } from "../repos/operationalEventsRepo";
 import {
   acknowledgeAlert,
   getActiveAlerts,
@@ -22,10 +23,16 @@ router.get("/status", requireAuth, (_req, res) => {
   });
 });
 
-router.get("/events/recent", requireAuth, (req, res) => {
+router.get("/events/recent", requireAuth, async (req, res) => {
   const limit = Number(req.query.limit);
   const safeLimit = Number.isFinite(limit) ? limit : 50;
-  res.json({ events: getRecentEvents(safeLimit) });
+  
+  try {
+    const events = await getRecentOperationalEvents(safeLimit);
+    res.json({ events });
+  } catch {
+    res.json({ events: getRecentEvents(safeLimit) });
+  }
 });
 
 router.get("/alerts/active", (_req, res) => {

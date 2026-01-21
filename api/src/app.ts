@@ -44,4 +44,12 @@ app.use(notFoundHandler);
 // 💥 Global error handler (last, always)
 app.use(errorHandler);
 
+process.on('unhandledRejection', (reason) => {
+  console.error('[FATAL] Unhandled rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught exception:', err);
+});
+
 export default app;

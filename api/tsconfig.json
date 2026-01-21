@@ -8,6 +8,7 @@
     "esModuleInterop": true,
     "types": ["node", "jest"],
     "skipLibCheck": true,
+    "lib": ["ES2022", "DOM"]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]

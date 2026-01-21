@@ -4,6 +4,7 @@ import prisma from "../prisma";
 import { notificationProvider } from "../services/notifications";
 import { makeOutboundCall } from "../services/outboundCall";
 import { emitEvent } from "../lib/events";
+import { forwardAlertToN8N } from '../services/alertForwarder';
 
 const router = Router();
 
@@ -82,6 +83,21 @@ router.post("/", async (req, res) => {
         staffFollowupRequired,
       },
     });
+
+    if (staffFollowupRequired) {
+      console.log('[alerts] triggered callback_staff_required');
+
+      await forwardAlertToN8N({
+        alertType: 'callback_staff_required',
+        eventName: 'callback_requested',
+        severity: 'warning',
+        summary: 'Callback requires staff follow-up',
+        environment: process.env.NODE_ENV || 'development',
+        triggeredAt: new Date().toISOString(),
+        correlationId: callback.id,
+        ageSeconds: 0,
+      });
+    }
 
     const source =
       callback.source === "voice" || callback.source === "sms"

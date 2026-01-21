@@ -13,6 +13,7 @@ import {
 import { VOICE_LINES } from "../voice/voiceLines";
 import { pickLine } from "../voice/pickLine";
 import { emitEvent } from "../lib/events";
+import { logger } from "../utils/logger";
 import { validationFail } from "../lib/validationFail";
 import {
   createCorrelationId,
@@ -253,7 +254,7 @@ router.post("/voice/time", async (req, res) => {
   } catch (err) {
     emitEvent("callback_create_failed", { source: "voice" });
     emitEvent("callback_create_result", { source: "voice", ok: false });
-    console.error("[voice callback error]", err);
+    logger.error("[voice callback error]", err);
     twiml.say(VOICE, pickLine(VOICE_LINES.retry));
     twiml.hangup();
     if (callSid) {

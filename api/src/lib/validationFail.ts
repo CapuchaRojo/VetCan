@@ -1,4 +1,5 @@
 import { emitEvent } from "./events";
+import { logger } from "../utils/logger";
 
 type ValidationFailParams = {
   scope: "voice" | "appointments";
@@ -7,7 +8,7 @@ type ValidationFailParams = {
 };
 
 export function validationFail(params: ValidationFailParams) {
-  console.warn(`[validation] ${params.scope}: ${params.reason}`);
+  logger.warn(`[validation] ${params.scope}: ${params.reason}`);
   emitEvent("validation_failed", {
     scope: params.scope,
     reason: params.reason,

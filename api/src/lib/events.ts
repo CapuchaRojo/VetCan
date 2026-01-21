@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { getCorrelationId } from "./requestContext";
 import { createOperationalEvent } from "../repos/operationalEventsRepo";
 import { upsertEscalationDelivery } from "../repos/escalationDeliveryRepo";
+import { logger } from "../utils/logger";
 
 export type EventName =
   | "voice_state_transition"
@@ -188,7 +189,7 @@ async function persistOperationalEvent(
   if (name !== "alert_escalation_requested") return;
 
   if (!correlationId) {
-    console.warn("[events] Missing correlationId; escalation delivery skipped.");
+    logger.warn("[events] Missing correlationId; escalation delivery skipped.");
     return;
   }
 
@@ -261,7 +262,7 @@ export function emitEvent<E extends EventName>(
   emitter.emit(name, finalPayload);
 
   void persistOperationalEvent(name, finalPayload).catch((err) => {
-    console.warn("[events] Failed to persist operational event.", err);
+    logger.warn("[events] Failed to persist operational event.", err);
   });
 }
 

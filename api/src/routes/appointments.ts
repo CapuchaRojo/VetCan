@@ -3,6 +3,7 @@ import prisma from '../prisma';
 import requireAuth from '../middleware/auth';
 import { emitEvent } from '../lib/events';
 import { validationFail } from '../lib/validationFail';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -22,7 +23,7 @@ router.get('/', async (_req, res) => {
 
     return res.json(appointments);
   } catch (err) {
-    console.error('APPOINTMENT ERROR:', err);
+    logger.error('APPOINTMENT ERROR:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -48,7 +49,7 @@ router.get('/:id', async (req, res) => {
       doctorId: Number(appointment.doctorId),
     });
   } catch (err) {
-    console.error('APPOINTMENT ERROR:', err);
+    logger.error('APPOINTMENT ERROR:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -106,7 +107,7 @@ if (conflict) {
     });
   } catch (err) {
     emitEvent("appointment_create_result", { ok: false });
-    console.error('APPOINTMENT ERROR:', err);
+    logger.error('APPOINTMENT ERROR:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -160,7 +161,7 @@ router.put('/:id', async (req, res) => {
       doctorId: Number(updated.doctorId),
     });
   } catch (err) {
-    console.error('APPOINTMENT ERROR:', err);
+    logger.error('APPOINTMENT ERROR:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -179,7 +180,7 @@ router.delete('/:id', async (req, res) => {
 
     return res.status(204).send();
   } catch (err) {
-    console.error('APPOINTMENT ERROR:', err);
+    logger.error('APPOINTMENT ERROR:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

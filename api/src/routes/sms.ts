@@ -2,6 +2,7 @@
 import { Router } from 'express';
 import prisma from '../prisma';
 import { notificationProvider } from '../services/notifications';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -31,7 +32,7 @@ router.post('/sms', async (req, res) => {
   const from = req.body.From;
   const body = req.body.Body || '';
 
-  console.log('[TWILIO INBOUND SMS]', { from, body });
+  logger.info('[TWILIO INBOUND SMS]', { from, body });
 
   const intent = detectIntent(body);
 

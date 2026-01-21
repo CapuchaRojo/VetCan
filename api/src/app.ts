@@ -4,6 +4,7 @@ import alertsRouter from './routes/alerts';
 import { apiLimiter } from './middleware/rateLimit';
 import alertsStreamRouter from "./routes/alertsStream";
 import { requestLogger } from './middleware/requestLogger';
+import { logger } from './utils/logger';
 import {
   notFoundHandler,
   errorHandler,
@@ -49,11 +50,11 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 process.on('unhandledRejection', (reason) => {
-  console.error('[FATAL] Unhandled rejection:', reason);
+  logger.error('[FATAL] Unhandled rejection:', reason);
 });
 
 process.on('uncaughtException', (err) => {
-  console.error('[FATAL] Uncaught exception:', err);
+  logger.error('[FATAL] Uncaught exception:', err);
 });
 
 export default app;

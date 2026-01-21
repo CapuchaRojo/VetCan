@@ -1,4 +1,5 @@
 import twilio, { Twilio } from 'twilio';
+import { logger } from '../utils/logger';
 
 let client: Twilio | null = null;
 
@@ -13,12 +14,12 @@ function getClient(): Twilio | null {
     const authToken = process.env.TWILIO_AUTH_TOKEN;
   
     if (!accountSid || !authToken) {
-      console.warn('[NOTIFY] Twilio credentials missing. SMS disabled.');
+      logger.warn('[NOTIFY] Twilio credentials missing. SMS disabled.');
       return null;
     }
 
     if (!accountSid.startsWith('AC')) {
-      console.error('[NOTIFY] Invalid Twilio Account SID format. SMS disabled.');
+      logger.error('[NOTIFY] Invalid Twilio Account SID format. SMS disabled.');
       return null;
     }
 
@@ -35,7 +36,7 @@ export const notificationProvider = {
     const twilioClient = getClient();
 
     if (!twilioClient || !fromNumber) {
-      console.warn('[NOTIFY] TWILIO_FROM_NUMBER not set. Message:', message);
+      logger.warn('[NOTIFY] TWILIO_FROM_NUMBER not set. Message:', message);
       return;
     }
 
@@ -46,9 +47,9 @@ export const notificationProvider = {
         body: message,
       }); 
 
-      console.log('[NOTIFY] SMS sent:', result.sid);
+      logger.info('[NOTIFY] SMS sent:', result.sid);
     } catch (err) {
-      console.error('[NOTIFY] Failed to send SMS:', err);
+      logger.error('[NOTIFY] Failed to send SMS:', err);
     }
   },
 };

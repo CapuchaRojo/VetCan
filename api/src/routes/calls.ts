@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import prisma from '../prisma';
+import { logger } from '../utils/logger';
 import requireAuth from '../middleware/auth';
 
 const router = Router();
@@ -16,7 +17,7 @@ router.get('/', async (_req, res) => {
     const calls = await prisma.call.findMany();
     res.json(calls);
   } catch (err) {
-    console.error('CALLS ERROR:', err);
+    logger.error('CALLS ERROR:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -39,7 +40,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(call);
   } catch (err) {
-    console.error('CALL CREATE ERROR:', err);
+    logger.error('CALL CREATE ERROR:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

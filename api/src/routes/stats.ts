@@ -1,5 +1,6 @@
 import { Router } from "express";
 import prisma from "../prisma";
+import { logger } from "../utils/logger";
 
 const router = Router();
 
@@ -72,7 +73,7 @@ res.json({
   updatedAt: new Date().toISOString(),
 });
   } catch (err) {
-    console.error("[stats error]", err);
+    logger.error("[stats error]", err);
     res.status(500).json({ error: "Failed to load stats" });
   }
 });

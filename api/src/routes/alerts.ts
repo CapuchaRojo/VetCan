@@ -1,6 +1,7 @@
 import { Router } from "express";
 import prisma from "../prisma";
 import { emitEvent } from "../lib/events";
+import { logger } from "../utils/logger";
 
 const router = Router();
 
@@ -70,7 +71,7 @@ emitEvent("alert_escalation_requested", {
 
     res.status(201).json({ ok: true, alert });
   } catch (err) {
-    console.error("[alerts POST]", err);
+    logger.error("[alerts POST]", err);
     res.status(500).json({ error: "Failed to create alert" });
   }
 });

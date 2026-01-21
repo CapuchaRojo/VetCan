@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { logger } from "../utils/logger";
 
 const RAW_NODE_ENV = process.env.NODE_ENV ?? "development";
 
@@ -46,7 +47,7 @@ export default function requireAuth(
    */
   const secret = resolveJwtSecret();
   if (!secret) {
-    console.error("[auth] JWT_SECRET missing");
+    logger.error("[auth] JWT_SECRET missing");
     return res.status(500).json({ error: "Auth misconfigured" });
   }
 

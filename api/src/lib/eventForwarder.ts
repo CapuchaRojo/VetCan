@@ -1,6 +1,7 @@
 import http from "node:http";
 import https from "node:https";
 import { onEvent, type EventName } from "./events";
+import { logger } from "../utils/logger";
 
 let initialized = false;
 let forwarderEnabled = false;
@@ -36,7 +37,7 @@ export function initEventForwarder() {
     try {
       target = new URL(webhookUrl);
     } catch {
-      console.warn("[events] Invalid EVENT_WEBHOOK_URL; forwarding disabled.");
+      logger.warn("[events] Invalid EVENT_WEBHOOK_URL; forwarding disabled.");
     }
 
     if (target) {
@@ -83,7 +84,7 @@ export function initEventForwarder() {
         );
 
         req.on("error", () => {
-          console.warn("[events] Failed to forward event.");
+        logger.warn("[events] Failed to forward event.");
         });
 
         req.write(body);
@@ -100,7 +101,7 @@ export function initEventForwarder() {
     if (!n8nWebhookUrl) {
       if (!n8nWarned) {
         n8nWarned = true;
-        console.warn("[events] N8N_ALERT_WEBHOOK_URL not set; n8n forwarding disabled.");
+        logger.warn("[events] N8N_ALERT_WEBHOOK_URL not set; n8n forwarding disabled.");
       }
       return;
     }
@@ -111,7 +112,7 @@ export function initEventForwarder() {
     } catch {
       if (!n8nWarned) {
         n8nWarned = true;
-        console.warn("[events] Invalid N8N_ALERT_WEBHOOK_URL; forwarding disabled.");
+        logger.warn("[events] Invalid N8N_ALERT_WEBHOOK_URL; forwarding disabled.");
       }
       return;
     }
@@ -141,7 +142,7 @@ export function initEventForwarder() {
     );
 
     req.on("error", () => {
-      console.warn("[events] Failed to forward n8n escalation.");
+      logger.warn("[events] Failed to forward n8n escalation.");
     });
 
     req.write(body);

@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { logger } from '../utils/logger';
 
 export function notFoundHandler(
   req: Request,
@@ -21,7 +22,7 @@ export function errorHandler(
   const status = err.statusCode || err.status || 500;
 
   // 🔒 Log once, centrally
-  console.error('[API ERROR]', {
+  logger.error('[API ERROR]', {
     method: req.method,
     path: req.originalUrl,
     status,

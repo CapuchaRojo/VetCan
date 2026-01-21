@@ -4,6 +4,7 @@ import prisma from "../prisma";
 import { notificationProvider } from "../services/notifications";
 import { makeOutboundCall } from "../services/outboundCall";
 import { emitEvent } from "../lib/events";
+import { logger } from "../utils/logger";
 
 const router = Router();
 
@@ -96,8 +97,7 @@ router.post("/", async (req, res) => {
         correlationId: callback.id,
         environment: process.env.NODE_ENV || "development",
       });
-    } catch (err) {
-      console.warn("[callbacks POST] emitEvent failed:", err);
+    } catch (err) {logger.warn("[callbacks POST] emitEvent failed:", err);
     }
 
     // best-effort notification
@@ -106,8 +106,7 @@ router.post("/", async (req, res) => {
         callback.phone,
         `Thanks ${callback.name}, we received your request and will contact you shortly.`
       );
-    } catch (err) {
-      console.warn("[callbacks POST] notification failed:", err);
+    } catch (err) {logger.warn("[callbacks POST] notification failed:", err);
     }
 
     return res.status(201).json({
@@ -115,8 +114,7 @@ router.post("/", async (req, res) => {
       status: callback.status,
       message: "Callback request received",
     });
-  } catch (err) {
-    console.error("[callbacks POST] error:", err);
+  } catch (err) {logger.error("[callbacks POST] error:", err);
     return res.status(500).json({ error: "Callback creation failed" });
   }
 });
@@ -130,8 +128,7 @@ router.get("/", async (_req, res) => {
       orderBy: { createdAt: "desc" },
     });
     return res.json(callbacks);
-  } catch (err) {
-    console.error("[callbacks GET] error:", err);
+  } catch (err) {logger.error("[callbacks GET] error:", err);
     return res.status(500).json({ error: "Failed to fetch callbacks" });
   }
 });
@@ -161,8 +158,7 @@ router.post("/:id/complete", async (req, res) => {
         callback.phone,
         "Thanks for speaking with us! If you need anything else, feel free to reach out."
       );
-    } catch (err) {
-      console.warn("[callbacks COMPLETE] notification failed:", err);
+    } catch (err) {logger.warn("[callbacks COMPLETE] notification failed:", err);
     }
 
     return res.json({
@@ -170,8 +166,7 @@ router.post("/:id/complete", async (req, res) => {
       status: callback.status,
       message: "Callback marked as completed",
     });
-  } catch (err) {
-    console.error("[callbacks COMPLETE] error:", err);
+  } catch (err) {logger.error("[callbacks COMPLETE] error:", err);
     return res.status(500).json({ error: "Failed to complete callback" });
   }
 });
@@ -220,8 +215,7 @@ router.post("/:id/call", async (req, res) => {
         from: fromNumber,
         url: getAiVoiceUrl(),
       });
-    } catch (err) {
-      console.error("[callbacks CALL] outbound call failed:", err);
+    } catch (err) {logger.error("[callbacks CALL] outbound call failed:", err);
       return res.status(502).json({ error: "Outbound call failed" });
     }
 
@@ -230,8 +224,7 @@ router.post("/:id/call", async (req, res) => {
       message: "Outbound call initiated",
       result,
     });
-  } catch (err: any) {
-    console.error("[callbacks CALL] error:", err);
+  } catch (err: any) {logger.error("[callbacks CALL] error:", err);
     return res.status(500).json({ error: "Outbound call failed" });
   }
 });
@@ -320,8 +313,7 @@ router.post("/:id/ai-call", async (req, res) => {
 
     try {
       emitEvent("ai_call_initiated", { mode: "twilio" });
-    } catch (err) {
-      console.warn("[callbacks AI-CALL] emitEvent failed:", err);
+    } catch (err) {logger.warn("[callbacks AI-CALL] emitEvent failed:", err);
     }
 
     try {
@@ -330,8 +322,7 @@ router.post("/:id/ai-call", async (req, res) => {
         from: fromNumber,
         url: twimlUrl,
       });
-    } catch (err) {
-      console.error("[callbacks AI-CALL] Twilio failed:", err);
+    } catch (err) {logger.error("[callbacks AI-CALL] Twilio failed:", err);
       return res.status(502).json({ error: "AI call failed" });
     }
 
@@ -343,13 +334,11 @@ router.post("/:id/ai-call", async (req, res) => {
           lastAttemptAt: new Date(),
         },
       });
-    } catch (err) {
-      console.error("[callbacks AI-CALL] DB update failed:", err);
+    } catch (err) {logger.error("[callbacks AI-CALL] DB update failed:", err);
     }
 
     return res.json({ ok: true, mode: "twilio" });
-  } catch (err) {
-    console.error("[callbacks AI-CALL] error:", err);
+  } catch (err) {logger.error("[callbacks AI-CALL] error:", err);
     return res.status(500).json({ error: "AI callback failed" });
   }
 });

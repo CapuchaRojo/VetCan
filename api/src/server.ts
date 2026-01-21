@@ -3,6 +3,7 @@ import app from './app';
 import { initEventForwarder } from './lib/eventForwarder';
 import { initAlertEvaluator } from './lib/alerts';
 import { assertSafeProductionEnv } from './lib/envGuards';
+import { logger } from './utils/logger';
 
 function validateRequiredEnv() {
   if (process.env.NODE_ENV === 'test') return;
@@ -30,6 +31,6 @@ const PORT = process.env.PORT || 4000;
 
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
-    console.log(`API listening on port ${PORT}`);
+    logger.info(`API listening on port ${PORT}`);
   });
 }

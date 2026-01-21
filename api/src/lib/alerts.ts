@@ -1,5 +1,6 @@
 import { emitEvent, getEventCounts, onEvent } from "./events";
 import { pushAlertUpdate } from "./alertStream";
+import { logger } from "../utils/logger";
 
 /**
  * Alert state tracked in-memory
@@ -192,7 +193,7 @@ export function initAlertEvaluator() {
         };
 
         activeAlerts.set(key, alert);
-        console.debug("[alerts] triggered", alert.alertType);
+        logger.debug("[alerts] triggered", alert.alertType);
 
         emitEvent("alert_triggered", {
           alertType: alert.alertType,
@@ -280,7 +281,7 @@ export function initAlertEvaluator() {
   if (thresholds.length === 0) return;
 
   if (!windowSeconds) {
-    console.warn("[alerts] Invalid ALERT_WINDOW_SECONDS; alerts disabled.");
+    logger.warn("[alerts] Invalid ALERT_WINDOW_SECONDS; alerts disabled.");
     return;
   }
 

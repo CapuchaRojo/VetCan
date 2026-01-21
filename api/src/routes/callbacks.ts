@@ -4,7 +4,6 @@ import prisma from "../prisma";
 import { notificationProvider } from "../services/notifications";
 import { makeOutboundCall } from "../services/outboundCall";
 import { emitEvent } from "../lib/events";
-import { forwardAlertToN8N } from '../services/alertForwarder';
 
 const router = Router();
 
@@ -84,33 +83,22 @@ router.post("/", async (req, res) => {
       },
     });
 
-    if (staffFollowupRequired) {
-      console.log('[alerts] triggered callback_staff_required');
-
-      await forwardAlertToN8N({
-        alertType: 'callback_staff_required',
-        eventName: 'callback_requested',
-        severity: 'warning',
-        summary: 'Callback requires staff follow-up',
-        environment: process.env.NODE_ENV || 'development',
-        triggeredAt: new Date().toISOString(),
-        correlationId: callback.id,
-        ageSeconds: 0,
-      });
-    }
-
     const source =
       callback.source === "voice" || callback.source === "sms"
         ? callback.source
         : "sms";
 
-    emitEvent("callback_requested", {
-      source,
-      phone: callback.phone,
-      staffFollowupRequired: callback.staffFollowupRequired,
-      correlationId: callback.id,
-      environment: process.env.NODE_ENV || "development",
-    });
+    try {
+      emitEvent("callback_requested", {
+        source,
+        phone: callback.phone,
+        staffFollowupRequired: callback.staffFollowupRequired,
+        correlationId: callback.id,
+        environment: process.env.NODE_ENV || "development",
+      });
+    } catch (err) {
+      console.warn("[callbacks POST] emitEvent failed:", err);
+    }
 
     // best-effort notification
     try {
@@ -225,11 +213,17 @@ router.post("/:id/call", async (req, res) => {
       return res.status(500).json({ error: 'TWILIO_PHONE_NUMBER not configured' });
     }
 
-    const result = await makeOutboundCall({
-      to,
-      from: fromNumber,
-      url: getAiVoiceUrl(),
-    });
+    let result;
+    try {
+      result = await makeOutboundCall({
+        to,
+        from: fromNumber,
+        url: getAiVoiceUrl(),
+      });
+    } catch (err) {
+      console.error("[callbacks CALL] outbound call failed:", err);
+      return res.status(502).json({ error: "Outbound call failed" });
+    }
 
     return res.json({
       ok: true,
@@ -324,20 +318,34 @@ router.post("/:id/ai-call", async (req, res) => {
       return res.status(500).json({ error: 'TWILIO_PHONE_NUMBER not configured' });
     }
 
-    emitEvent("ai_call_initiated", { mode: "twilio" });
-    await makeOutboundCall({
-      to: callback.phone,
-      from: fromNumber,
-      url: twimlUrl,
-    });
+    try {
+      emitEvent("ai_call_initiated", { mode: "twilio" });
+    } catch (err) {
+      console.warn("[callbacks AI-CALL] emitEvent failed:", err);
+    }
 
-    await prisma.callbackRequest.update({
-      where: { id },
-      data: {
-        aiHandled: true,
-        lastAttemptAt: new Date(),
-      },
-    });
+    try {
+      await makeOutboundCall({
+        to: callback.phone,
+        from: fromNumber,
+        url: twimlUrl,
+      });
+    } catch (err) {
+      console.error("[callbacks AI-CALL] Twilio failed:", err);
+      return res.status(502).json({ error: "AI call failed" });
+    }
+
+      try {
+      await prisma.callbackRequest.update({
+        where: { id },
+        data: {
+          aiHandled: true,
+          lastAttemptAt: new Date(),
+        },
+      });
+    } catch (err) {
+      console.error("[callbacks AI-CALL] DB update failed:", err);
+    }
 
     return res.json({ ok: true, mode: "twilio" });
   } catch (err) {

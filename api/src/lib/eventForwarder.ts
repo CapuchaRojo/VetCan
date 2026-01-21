@@ -31,68 +31,69 @@ export function initEventForwarder() {
 
   const webhookUrl = process.env.EVENT_WEBHOOK_URL;
   const n8nWebhookUrl = process.env.N8N_ALERT_WEBHOOK_URL;
-  if (!webhookUrl) return;
+  if (webhookUrl) {
+    let target: URL | null = null;
+    try {
+      target = new URL(webhookUrl);
+    } catch {
+      console.warn("[events] Invalid EVENT_WEBHOOK_URL; forwarding disabled.");
+    }
 
-  let target: URL;
-  try {
-    target = new URL(webhookUrl);
-  } catch {
-    console.warn("[events] Invalid EVENT_WEBHOOK_URL; forwarding disabled.");
-    return;
-  }
+    if (target) {
+      forwarderEnabled = true;
 
-  forwarderEnabled = true;
+      const isHttps = target.protocol === "https:";
+      const httpClient = isHttps ? https : http;
+      const port = target.port
+        ? Number(target.port)
+        : isHttps
+          ? 443
+          : 80;
+      const path = `${target.pathname}${target.search}`;
 
-  const isHttps = target.protocol === "https:";
-  const httpClient = isHttps ? https : http;
-  const port = target.port
-    ? Number(target.port)
-    : isHttps
-      ? 443
-      : 80;
-  const path = `${target.pathname}${target.search}`;
+      const postEvent = (eventName: EventName, payload: unknown) => {
+        const correlationId =
+          typeof payload === "object" &&
+          payload !== null &&
+          "correlationId" in payload
+            ? (payload as { correlationId?: string }).correlationId
+            : undefined;
 
-  const postEvent = (eventName: EventName, payload: unknown) => {
-    const correlationId =
-      typeof payload === "object" &&
-      payload !== null &&
-      "correlationId" in payload
-        ? (payload as { correlationId?: string }).correlationId
-        : undefined;
+        const body = JSON.stringify({
+          eventName,
+          eventVersion: 1,
+          payload,
+          timestamp: new Date().toISOString(),
+          environment: process.env.NODE_ENV || "local",
+          correlationId,
+        });
 
-    const body = JSON.stringify({
-      eventName,
-      eventVersion: 1,
-      payload,
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || "local",
-      correlationId,
-    });
+        const req = httpClient.request(
+          {
+            method: "POST",
+            hostname: target.hostname,
+            port,
+            path,
+            headers: {
+              "content-type": "application/json",
+              "content-length": Buffer.byteLength(body),
+            },
+          },
+          (res) => res.resume()
+        );
 
-    const req = httpClient.request(
-      {
-        method: "POST",
-        hostname: target.hostname,
-        port,
-        path,
-        headers: {
-          "content-type": "application/json",
-          "content-length": Buffer.byteLength(body),
-        },
-      },
-      (res) => res.resume()
-    );
+        req.on("error", () => {
+          console.warn("[events] Failed to forward event.");
+        });
 
-    req.on("error", () => {
-      console.warn("[events] Failed to forward event.");
-    });
+        req.write(body);
+        req.end();
+      };
 
-    req.write(body);
-    req.end();
-  };
-
-  for (const eventName of EVENT_NAMES) {
-    onEvent(eventName, (payload) => postEvent(eventName, payload));
+      for (const eventName of EVENT_NAMES) {
+        onEvent(eventName, (payload) => postEvent(eventName, payload));
+      }
+    }
   }
 
   const postN8nEvent = (payload: unknown) => {

@@ -6,6 +6,8 @@ services:
       context: .
       dockerfile: infra/Dockerfile.api
     env_file: .env
+    environment:
+      N8N_ALERT_WEBHOOK_URL: http://n8n:5678/webhook/edc83c11-56a3-42e5-b642-a402d423148b
     ports:
       - "4000:4000"
     depends_on:

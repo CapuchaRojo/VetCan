@@ -1,4 +1,4 @@
-import { AlertEscalationPayload } from '../types/alerts';
+import type { AlertEscalationPayload } from '../types/alerts';
 
 export async function forwardAlertToN8N(payload: AlertEscalationPayload) {
   const url = process.env.N8N_ALERT_WEBHOOK_URL;
@@ -9,7 +9,13 @@ export async function forwardAlertToN8N(payload: AlertEscalationPayload) {
   }
 
   try {
-    const res = await fetch(url, {
+    const fetchFn = globalThis.fetch;
+    if (!fetchFn) {
+      console.warn('[events] fetch unavailable; n8n forwarding disabled.');
+      return;
+    }
+
+    const res = await fetchFn(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

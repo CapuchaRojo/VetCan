@@ -18,7 +18,11 @@ app.use(express.json({ limit: '1mb' }));
 app.use('/api/alerts', alertsRouter);
 
 // 🔒 PUBLIC API: rate limited + logged
-app.use('/api', apiLimiter);
+app.use('/api', (req, res, next) => {
+  if (req.path === '/callbacks') return next();
+  return apiLimiter(req, res, next);
+});
+
 app.use('/api', requestLogger);
 
 // 🚦 API ROUTES

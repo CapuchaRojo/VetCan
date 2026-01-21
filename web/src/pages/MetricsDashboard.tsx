@@ -6,6 +6,11 @@ type MetricsResponse = {
   environment: string;
   lastUpdated: string;
   eventCounts: Record<string, number>;
+  ackTimeline: Array<{
+    eventName: string;
+    createdAt: string;
+    payload: Record<string, any>;
+  }>;
   activeAlerts: Array<{
     alertType: string;
     eventName: string;
@@ -230,6 +235,7 @@ export default function MetricsDashboard() {
   const seconds = Math.floor(uptime % 60);
   const uptimeLabel = `${hours}h ${minutes}m ${seconds}s`;
   const activeAlertCount = metrics?.activeAlerts.length ?? 0;
+  const ackTimeline = metrics?.ackTimeline || [];
 
   const eventEntries = Object.entries(metrics?.eventCounts || {}).sort(
     (a, b) => b[1] - a[1]
@@ -855,6 +861,44 @@ export default function MetricsDashboard() {
                       </td>
                       <td style={tableCellStyle}>
                         {event.payload?.correlationId || "Not available"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section style={{ marginTop: "28px" }}>
+          <SectionTitle>Alert Acknowledgement Timeline</SectionTitle>
+          {ackTimeline.length === 0 ? (
+            <p style={{ color: "#7b726a" }}>No alert acknowledgements yet.</p>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ textAlign: "left", background: "#f0ebe4" }}>
+                    <th style={tableHeaderStyle}>Alert</th>
+                    <th style={tableHeaderStyle}>Operator</th>
+                    <th style={tableHeaderStyle}>Acknowledged At</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ackTimeline.map((entry, idx) => (
+                    <tr key={`${entry.eventName}-${entry.createdAt}-${idx}`}>
+                      <td style={tableCellStyle}>
+                        {entry.payload?.alertType || "Alert"}
+                      </td>
+                      <td style={tableCellStyle}>
+                        {entry.payload?.operatorName
+                          ? `${entry.payload.operatorName}${
+                              entry.payload.role ? ` (${entry.payload.role})` : ""
+                            }`
+                          : "Operator unknown"}
+                      </td>
+                      <td style={tableCellStyle}>
+                        {new Date(entry.createdAt).toLocaleString()}
                       </td>
                     </tr>
                   ))}

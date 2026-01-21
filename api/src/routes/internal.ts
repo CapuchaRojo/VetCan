@@ -2,6 +2,7 @@ import { Router } from "express";
 import prisma from "../prisma";
 import { emitEvent, getRecentEvents, recordInternalEvent } from "../lib/events";
 import { getRecentOperationalEvents } from "../repos/operationalEventsRepo";
+import { getAlertAckTimeline } from "../repos/ackTimelineRepo";
 import {
   acknowledgeAlert,
   getActiveAlerts,
@@ -10,6 +11,7 @@ import {
 import { isEventForwarderEnabled } from "../lib/eventForwarder";
 import requireAuth, { requireRole } from "../middleware/auth";
 import { IS_DEV } from "../config/env";
+import { logger } from "../utils/logger";
 
 const router = Router();
 
@@ -26,12 +28,24 @@ router.get("/status", requireAuth, (_req, res) => {
 router.get("/events/recent", requireAuth, async (req, res) => {
   const limit = Number(req.query.limit);
   const safeLimit = Number.isFinite(limit) ? limit : 50;
-  
+
   try {
     const events = await getRecentOperationalEvents(safeLimit);
     res.json({ events });
   } catch {
     res.json({ events: getRecentEvents(safeLimit) });
+  }
+});
+
+router.get("/alerts/ack-timeline", requireAuth, async (req, res) => {
+  const limit = Number(req.query.limit);
+  const safeLimit = Number.isFinite(limit) ? limit : 50;
+  try {
+    const timeline = await getAlertAckTimeline(safeLimit);
+    res.json({ timeline });
+  } catch (err) {
+    logger.warn("[internal] ack timeline unavailable", err);
+    res.json({ timeline: [] });
   }
 });
 

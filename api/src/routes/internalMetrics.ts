@@ -4,6 +4,7 @@ import { getActiveAlerts } from "../lib/alerts";
 import { getOperationalEventCounts } from "../repos/operationalEventsRepo";
 import { getAlertSnapshots } from "../repos/alertsRepo";
 import { getRecentEscalationDeliveries } from "../repos/escalationDeliveriesRepo";
+import { getAlertAckTimeline } from "../repos/ackTimelineRepo";
 import { logger } from "../utils/logger";
 import requireAuth from "../middleware/auth";
 
@@ -20,10 +21,11 @@ router.get("/", async (_req, res) => {
       sms_received: 0,
       voice_call_started: 0,
     };
-    const [dbCounts, dbAlerts, dbDeliveries] = await Promise.all([
+    const [dbCounts, dbAlerts, dbDeliveries, dbAckTimeline] = await Promise.all([
       getOperationalEventCounts(),
       getAlertSnapshots(),
       getRecentEscalationDeliveries(50),
+      getAlertAckTimeline(50),
     ]);
 
     const eventCounts = {
@@ -52,6 +54,7 @@ router.get("/", async (_req, res) => {
       lastUpdated: new Date().toISOString(),
       eventCounts,
       activeAlerts,
+      ackTimeline: dbAckTimeline,
       deliveries,
       status: "ok",
     });
@@ -69,6 +72,7 @@ router.get("/", async (_req, res) => {
       lastUpdated: new Date().toISOString(),
       eventCounts: defaultCounts,
       activeAlerts: [],
+      ackTimeline: [],
       deliveries: [],
       status: "ok",
     });

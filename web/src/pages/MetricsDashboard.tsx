@@ -11,6 +11,18 @@ type MetricsResponse = {
     createdAt: string;
     payload: Record<string, any>;
   }>;
+  sla: {
+    callbacks: {
+      averageSeconds: number;
+      breachCount: number;
+      buckets: { le2m: number; le5m: number; le10m: number; gt10m: number };
+    };
+    alerts: {
+      averageSeconds: number;
+      breachCount: number;
+      buckets: { le2m: number; le5m: number; le10m: number; gt10m: number };
+    };
+  };
   activeAlerts: Array<{
     alertType: string;
     eventName: string;
@@ -236,6 +248,7 @@ export default function MetricsDashboard() {
   const uptimeLabel = `${hours}h ${minutes}m ${seconds}s`;
   const activeAlertCount = metrics?.activeAlerts.length ?? 0;
   const ackTimeline = metrics?.ackTimeline || [];
+  const sla = metrics?.sla;
 
   const eventEntries = Object.entries(metrics?.eventCounts || {}).sort(
     (a, b) => b[1] - a[1]
@@ -949,6 +962,94 @@ export default function MetricsDashboard() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </section>
+
+        <section style={{ marginTop: "28px" }}>
+          <SectionTitle>SLA Metrics</SectionTitle>
+          {!sla ? (
+            <p style={{ color: "#7b726a" }}>SLA data unavailable.</p>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: "12px",
+              }}
+            >
+              <article
+                style={{
+                  padding: "14px 16px",
+                  borderRadius: "14px",
+                  background: "#f9f4ee",
+                  border: "1px solid #e4dbd0",
+                }}
+              >
+                <p style={{ margin: 0, fontSize: "12px", color: "#7b726a" }}>
+                  Callback SLA Avg
+                </p>
+                <p style={{ margin: "8px 0 0", fontSize: "22px" }}>
+                  {sla.callbacks.averageSeconds}s
+                </p>
+                <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#7b726a" }}>
+                  Breaches (&gt;10m): {sla.callbacks.breachCount}
+                </p>
+              </article>
+              <article
+                style={{
+                  padding: "14px 16px",
+                  borderRadius: "14px",
+                  background: "#f9f4ee",
+                  border: "1px solid #e4dbd0",
+                }}
+              >
+                <p style={{ margin: 0, fontSize: "12px", color: "#7b726a" }}>
+                  Alert SLA Avg
+                </p>
+                <p style={{ margin: "8px 0 0", fontSize: "22px" }}>
+                  {sla.alerts.averageSeconds}s
+                </p>
+                <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#7b726a" }}>
+                  Breaches (&gt;10m): {sla.alerts.breachCount}
+                </p>
+              </article>
+              <article
+                style={{
+                  padding: "14px 16px",
+                  borderRadius: "14px",
+                  background: "#f9f4ee",
+                  border: "1px solid #e4dbd0",
+                }}
+              >
+                <p style={{ margin: 0, fontSize: "12px", color: "#7b726a" }}>
+                  Callback Buckets
+                </p>
+                <p style={{ margin: "8px 0 0", fontSize: "12px" }}>
+                  ≤2m {sla.callbacks.buckets.le2m} · ≤5m {sla.callbacks.buckets.le5m}
+                </p>
+                <p style={{ margin: "6px 0 0", fontSize: "12px" }}>
+                  ≤10m {sla.callbacks.buckets.le10m} · &gt;10m {sla.callbacks.buckets.gt10m}
+                </p>
+              </article>
+              <article
+                style={{
+                  padding: "14px 16px",
+                  borderRadius: "14px",
+                  background: "#f9f4ee",
+                  border: "1px solid #e4dbd0",
+                }}
+              >
+                <p style={{ margin: 0, fontSize: "12px", color: "#7b726a" }}>
+                  Alert Buckets
+                </p>
+                <p style={{ margin: "8px 0 0", fontSize: "12px" }}>
+                  ≤2m {sla.alerts.buckets.le2m} · ≤5m {sla.alerts.buckets.le5m}
+                </p>
+                <p style={{ margin: "6px 0 0", fontSize: "12px" }}>
+                  ≤10m {sla.alerts.buckets.le10m} · &gt;10m {sla.alerts.buckets.gt10m}
+                </p>
+              </article>
             </div>
           )}
         </section>

@@ -5,6 +5,7 @@ import { getOperationalEventCounts } from "../repos/operationalEventsRepo";
 import { getAlertSnapshots } from "../repos/alertsRepo";
 import { getRecentEscalationDeliveries } from "../repos/escalationDeliveriesRepo";
 import { getAlertAckTimeline } from "../repos/ackTimelineRepo";
+import { getSlaMetrics } from "../repos/slaMetricsRepo";
 import { logger } from "../utils/logger";
 import requireAuth from "../middleware/auth";
 
@@ -21,11 +22,12 @@ router.get("/", async (_req, res) => {
       sms_received: 0,
       voice_call_started: 0,
     };
-    const [dbCounts, dbAlerts, dbDeliveries, dbAckTimeline] = await Promise.all([
+    const [dbCounts, dbAlerts, dbDeliveries, dbAckTimeline, dbSla] = await Promise.all([
       getOperationalEventCounts(),
       getAlertSnapshots(),
       getRecentEscalationDeliveries(50),
       getAlertAckTimeline(50),
+      getSlaMetrics(),
     ]);
 
     const eventCounts = {
@@ -55,6 +57,7 @@ router.get("/", async (_req, res) => {
       eventCounts,
       activeAlerts,
       ackTimeline: dbAckTimeline,
+      sla: dbSla,
       deliveries,
       status: "ok",
     });
@@ -73,6 +76,10 @@ router.get("/", async (_req, res) => {
       eventCounts: defaultCounts,
       activeAlerts: [],
       ackTimeline: [],
+      sla: {
+        callbacks: { averageSeconds: 0, breachCount: 0, buckets: { le2m: 0, le5m: 0, le10m: 0, gt10m: 0 } },
+        alerts: { averageSeconds: 0, breachCount: 0, buckets: { le2m: 0, le5m: 0, le10m: 0, gt10m: 0 } },
+      },
       deliveries: [],
       status: "ok",
     });

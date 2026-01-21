@@ -17,11 +17,11 @@ services:
   worker:
     build:
       context: .
-      dockerfile: infra/Dockerfile.worker
-    restart: unless-stopped
-    environment:
-      REDIS_URL: redis://redis:6379
+      dockerfile: infra/Dockerfile.api
+    env_file: .env
+    command: npm run start:deliveries
     depends_on:
+      - db
       - redis
 
   web:

@@ -3,6 +3,8 @@ import { getEventCounts } from "../lib/events";
 import { getActiveAlerts } from "../lib/alerts";
 import { getOperationalEventCounts } from "../repos/operationalEventsRepo";
 import { getAlertSnapshots } from "../repos/alertsRepo";
+import { getRecentEscalationDeliveries } from "../repos/escalationDeliveriesRepo";
+import { logger } from "../utils/logger";
 import requireAuth from "../middleware/auth";
 
 const router = Router();
@@ -18,9 +20,10 @@ router.get("/", async (_req, res) => {
       sms_received: 0,
       voice_call_started: 0,
     };
-    const [dbCounts, dbAlerts] = await Promise.all([
+    const [dbCounts, dbAlerts, dbDeliveries] = await Promise.all([
       getOperationalEventCounts(),
       getAlertSnapshots(),
+      getRecentEscalationDeliveries(50),
     ]);
 
     const eventCounts = {
@@ -31,15 +34,29 @@ router.get("/", async (_req, res) => {
     const activeAlerts =
       dbAlerts && dbAlerts.length > 0 ? dbAlerts : getActiveAlerts();
 
+    const deliveries = dbDeliveries.map((delivery) => ({
+      dedupeKey: delivery.dedupeKey,
+      status: delivery.status,
+      attemptCount: delivery.attemptCount,
+      lastAttemptAt: delivery.lastAttemptAt
+        ? delivery.lastAttemptAt.toISOString()
+        : null,
+      lastError: delivery.lastError,
+      sentAt: delivery.sentAt ? delivery.sentAt.toISOString() : null,
+      eventName: delivery.event.eventName,
+    }));
+
     res.json({
       uptimeSeconds: Math.floor(process.uptime()),
       environment: process.env.NODE_ENV || "local",
       lastUpdated: new Date().toISOString(),
       eventCounts,
       activeAlerts,
+      deliveries,
       status: "ok",
     });
   } catch {
+    logger.warn("[metrics] DB metrics unavailable; falling back to memory.");
     const defaultCounts = {
       callback_requested: 0,
       alert_triggered: 0,
@@ -52,6 +69,7 @@ router.get("/", async (_req, res) => {
       lastUpdated: new Date().toISOString(),
       eventCounts: defaultCounts,
       activeAlerts: [],
+      deliveries: [],
       status: "ok",
     });
   }

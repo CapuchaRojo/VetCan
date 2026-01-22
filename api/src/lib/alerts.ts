@@ -1,6 +1,7 @@
 import { emitEvent, getEventCounts, onEvent } from "./events";
 import { pushAlertUpdate } from "./alertStream";
 import { logger } from "../utils/logger";
+import prisma from "../prisma";
 
 /**
  * Alert state tracked in-memory
@@ -122,6 +123,41 @@ function handleAlertEscalation(alert: AlertState) {
   // TODO(A5.8.1): wire alert escalation resolution to staff-handled events.
 }
 
+async function persistAlert(alert: AlertState) {
+  const data = {
+    severity: "warning",
+    alertType: alert.alertType,
+    eventName: alert.eventName,
+    correlationId: alert.correlationId ?? null,
+    source: alert.source ?? null,
+    environment: alert.environment,
+    summary: alert.summary,
+    triggeredAt: new Date(alert.firstTriggeredAt),
+  };
+
+  if (alert.correlationId) {
+    await prisma.alert.upsert({
+      where: {
+        alertType_correlationId: {
+          alertType: alert.alertType,
+          correlationId: alert.correlationId,
+        },
+      },
+      create: data,
+      update: {
+        source: data.source,
+        eventName: data.eventName,
+        environment: data.environment,
+        summary: data.summary,
+        severity: data.severity,
+      },
+    });
+    return;
+  }
+
+  await prisma.alert.create({ data });
+}
+
 /**
  * Helpers
  */
@@ -194,6 +230,10 @@ export function initAlertEvaluator() {
 
         activeAlerts.set(key, alert);
         logger.debug("[alerts] triggered", alert.alertType);
+
+        void persistAlert(alert).catch((err) => {
+          logger.warn("[alerts] Failed to persist alert.", err);
+        });
 
         emitEvent("alert_triggered", {
           alertType: alert.alertType,
@@ -318,6 +358,10 @@ export function initAlertEvaluator() {
          };
 
           activeAlerts.set(key, alert);
+
+          void persistAlert(alert).catch((err) => {
+            logger.warn("[alerts] Failed to persist alert.", err);
+          });
 
           // 🔔 Single, canonical trigger event
           emitEvent("alert_triggered", {

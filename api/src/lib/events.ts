@@ -82,6 +82,7 @@ export type EventPayloads = {
     alertId: string;
     alertType: string;
     eventName: string;
+    source?: string;              // ✅ ADD THIS LINE
     environment: string;
     acknowledgedAt: string;
     correlationId?: string;

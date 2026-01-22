@@ -78,51 +78,84 @@ emitEvent("alert_escalation_requested", {
 });
 
 router.post("/:id/ack", requireAuth, async (req, res) => {
-  const { id } = req.params;
+  const compositeId = req.params.id;
   const operator = (req as any).operator;
 
+  const acknowledgedBy =
+    typeof req.body?.acknowledgedBy === "string" && req.body.acknowledgedBy.trim()
+      ? req.body.acknowledgedBy.trim()
+      : operator?.name ?? operator?.id ?? "unknown";
+
+  const parts = compositeId.split(":");
+  if (parts.length !== 3) {
+    return res.status(400).json({ error: "Invalid alert id format" });
+  }
+
+  const [alertType, source, correlationId] = parts;
+  const acknowledgedAt = new Date();
+
   try {
-    const existing = await prisma.alert.findUnique({ where: { id } });
+    const existing = await prisma.alert.findFirst({
+      where: {
+        alertType,
+        correlationId,
+      },
+    });
+
     if (!existing) {
       return res.status(404).json({ error: "Alert not found" });
     }
 
-    const acknowledgedAt = new Date();
-    await prisma.alert.update({
-      where: { id },
+    if (existing.acknowledgedAt) {
+      return res.json({ ok: true, acknowledged: true });
+    }
+
+    await prisma.alert.updateMany({
+      where: {
+        alertType,
+        correlationId,
+        acknowledgedAt: null,
+      },
       data: {
         acknowledgedAt,
-        acknowledgedBy: operator?.name ?? operator?.id ?? "unknown",
+        acknowledgedBy,
       },
     });
 
+    // 1️⃣ Cancel pending/failed escalation deliveries
     await prisma.escalationDelivery.updateMany({
       where: {
         status: { in: ["pending", "failed"] },
         event: {
-          correlationId: id,
+          correlationId,
         },
       },
-      data: { status: "canceled" },
+      data: {
+        status: "canceled",
+        lastError: "Canceled due to alert acknowledgement",
+      },
     });
 
+    // 2️⃣ Emit acknowledgement event (source of truth)
     emitEvent("alert_acknowledged", {
-      alertId: id,
-      alertType: existing.alertType ?? "unknown",
+      alertId: compositeId,
+      alertType,
       eventName: existing.eventName ?? "unknown",
-      environment: existing.environment ?? process.env.NODE_ENV ?? "local",
+      source: existing.source ?? source,
+      correlationId,
+      environment: process.env.NODE_ENV ?? "local",
       acknowledgedAt: acknowledgedAt.toISOString(),
-      correlationId: id,
       operatorId: operator?.id,
       operatorName: operator?.name,
       role: operator?.role,
     });
 
-    return res.json({ ok: true });
+    return res.json({ ok: true, acknowledged: true });
   } catch (err) {
     logger.error("[alerts ACK]", err);
     return res.status(500).json({ error: "Failed to acknowledge alert" });
   }
 });
+
 
 export default router;

@@ -5,6 +5,7 @@ export interface AlertEscalationPayload {
   summary: string;
   environment: string;
   triggeredAt: string;
+  source: string;
   correlationId?: string;
   ageSeconds: number;
   callSid?: string;

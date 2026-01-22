@@ -269,6 +269,23 @@ export default function MetricsDashboard() {
     )
   );
 
+  const resolvedAlertKeys = new Set(
+    recentEvents
+      .filter(event => event.type === "alert_resolved")
+      .map(event => `${event.payload?.alertType || ""}:${event.payload?.eventName || ""}`)
+  );
+
+  function getAlertStatus(
+    alertType: string,
+    eventName: string,
+    acknowledgedAt?: string
+  ) {
+    const key = `${alertType}:${eventName}`;
+    if (resolvedAlertKeys.has(key)) return "Resolved";
+    if (acknowledgedAt) return "Acknowledged";
+    return "Active";
+  }
+
   const todayCount = callbacks.filter(cb => {
     const created = new Date(cb.createdAt);
     const now = new Date();
@@ -547,6 +564,7 @@ export default function MetricsDashboard() {
                     <th style={tableHeaderStyle}>Threshold</th>
                     <th style={tableHeaderStyle}>Triggered</th>
                     <th style={tableHeaderStyle}>Acknowledged</th>
+                    <th style={tableHeaderStyle}>Status</th>
                     <th style={tableHeaderStyle}>Action</th>
                   </tr>
                 </thead>
@@ -565,6 +583,23 @@ export default function MetricsDashboard() {
                         {alert.acknowledgedAt
                           ? `Acknowledged by ${alert.acknowledgedBy || "Unknown operator"} at ${new Date(alert.acknowledgedAt).toLocaleString()}`
                           : "Not acknowledged"}
+                      </td>
+                      <td style={tableCellStyle}>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            padding: "2px 8px",
+                            borderRadius: "999px",
+                            fontSize: "12px",
+                            background: "#f0ebe4",
+                          }}
+                        >
+                          {getAlertStatus(
+                            alert.alertType,
+                            alert.eventName,
+                            alert.acknowledgedAt
+                          )}
+                        </span>
                       </td>
                       <td style={tableCellStyle}>
                         {alert.acknowledgedAt ? (
@@ -759,6 +794,7 @@ export default function MetricsDashboard() {
                     <th style={tableHeaderStyle}>Window</th>
                     <th style={tableHeaderStyle}>Triggered</th>
                     <th style={tableHeaderStyle}>Last ACKed</th>
+                    <th style={tableHeaderStyle}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -766,7 +802,7 @@ export default function MetricsDashboard() {
                     <tr>
                       <td
                         style={{ padding: "14px 10px", color: "#7b726a" }}
-                        colSpan={6}
+                        colSpan={7}
                       >
                         No active alerts at this time.
                       </td>
@@ -786,6 +822,23 @@ export default function MetricsDashboard() {
                         {alert.acknowledgedAt
                           ? `Acknowledged by ${alert.acknowledgedBy || "Unknown operator"} at ${new Date(alert.acknowledgedAt).toLocaleString()}`
                           : "Not acknowledged"}
+                      </td>
+                      <td style={tableCellStyle}>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            padding: "2px 8px",
+                            borderRadius: "999px",
+                            fontSize: "12px",
+                            background: "#f0ebe4",
+                          }}
+                        >
+                          {getAlertStatus(
+                            alert.alertType,
+                            alert.eventName,
+                            alert.acknowledgedAt
+                          )}
+                        </span>
                       </td>
                     </tr>
                   ))}

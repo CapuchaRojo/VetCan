@@ -110,30 +110,32 @@ router.post("/:id/ack", requireAuth, async (req, res) => {
       return res.json({ ok: true, acknowledged: true });
     }
 
-    await prisma.alert.updateMany({
-      where: {
-        alertType,
-        correlationId,
-        acknowledgedAt: null,
-      },
-      data: {
-        acknowledgedAt,
-        acknowledgedBy,
-      },
-    });
-
-    // 1️⃣ Cancel pending/failed escalation deliveries
-    await prisma.escalationDelivery.updateMany({
-      where: {
-        status: { in: ["pending", "failed"] },
-        event: {
+    await prisma.$transaction(async (tx) => {
+      await tx.alert.updateMany({
+        where: {
+          alertType,
           correlationId,
+          acknowledgedAt: null,
         },
-      },
-      data: {
-        status: "canceled",
-        lastError: "Canceled due to alert acknowledgement",
-      },
+        data: {
+          acknowledgedAt,
+          acknowledgedBy,
+        },
+      });
+
+      // 1️⃣ Cancel pending/failed escalation deliveries
+      await tx.escalationDelivery.updateMany({
+        where: {
+          status: { in: ["pending", "failed"] },
+          event: {
+            correlationId,
+          },
+        },
+        data: {
+          status: "canceled",
+          lastError: "Canceled due to alert acknowledgement",
+        },
+      });
     });
 
     // 2️⃣ Emit acknowledgement event (source of truth)

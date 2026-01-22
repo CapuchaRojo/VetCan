@@ -1,6 +1,6 @@
 # NOTE:
 # Prisma is pinned to v5.22.0
-# SQLite is used in CI to avoid external services
+# CI runs PostgreSQL to match production
 
 name: VetCan API CI
 
@@ -15,9 +15,27 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      DATABASE_URL: file:./prisma/ci.db
+      DATABASE_URL: postgres://vetcan:vetcanpass@localhost:5432/vetcan
       JWT_SECRET: ci-secret
       NODE_ENV: test
+      POSTGRES_DB: vetcan
+      POSTGRES_USER: vetcan
+      POSTGRES_PASSWORD: vetcanpass
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: vetcan
+          POSTGRES_USER: vetcan
+          POSTGRES_PASSWORD: vetcanpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U vetcan"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
       - name: Checkout repo
@@ -35,18 +53,12 @@ jobs:
           cd api
           npm ci
 
-      - name: Prepare SQLite database
-        run: |
-          cd api
-          mkdir -p prisma
-          rm -f prisma/ci.db
-
       - name: Generate Prisma client
         run: |
           cd api
           npx prisma@5.22.0 generate
 
-      - name: Push schema to SQLite
+      - name: Push schema to PostgreSQL
         run: |
           cd api
           npx prisma@5.22.0 db push

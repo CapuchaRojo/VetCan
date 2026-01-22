@@ -274,6 +274,11 @@ export default function MetricsDashboard() {
       .filter(event => event.type === "alert_resolved")
       .map(event => `${event.payload?.alertType || ""}:${event.payload?.eventName || ""}`)
   );
+  const acknowledgedAlertKeys = new Set(
+    recentEvents
+      .filter(event => event.type === "alert_acknowledged")
+      .map(event => `${event.payload?.alertType || ""}:${event.payload?.eventName || ""}`)
+  );
 
   function getAlertStatus(
     alertType: string,
@@ -973,7 +978,12 @@ export default function MetricsDashboard() {
                           <span>{event.type}</span>
                           {event.type === "alert_resolved" && (
                             <span style={{ fontSize: "12px", color: "#7b726a" }}>
-                              Resolved at {new Date(event.createdAt).toLocaleString()}
+                              Resolved at {new Date(event.createdAt).toLocaleString()} —{" "}
+                              {acknowledgedAlertKeys.has(
+                                `${event.payload?.alertType || ""}:${event.payload?.eventName || ""}`
+                              )
+                                ? "Resolved after acknowledgment"
+                                : "Auto-resolved by system"}
                             </span>
                           )}
                         </div>
@@ -1059,6 +1069,11 @@ export default function MetricsDashboard() {
                               ? `by ${event.payload.operatorName}${event.payload.role ? ` (${event.payload.role})` : ""}`
                               : "Operator unknown"}
                           </span>
+                          {event.type === "alert_acknowledged" && (
+                            <span style={{ fontSize: "12px", color: "#7b726a" }}>
+                              Operator acknowledged alert
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td style={tableCellStyle}>

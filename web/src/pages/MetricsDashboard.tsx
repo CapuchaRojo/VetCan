@@ -31,6 +31,8 @@ type MetricsResponse = {
     windowSeconds: number;
     triggeredAt: string;
     environment: string;
+    acknowledgedAt?: string;
+    acknowledgedBy?: string;
   }>;
 };
 
@@ -71,6 +73,7 @@ type ActiveAlert = {
   threshold: number;
   firstTriggeredAt: string;
   acknowledgedAt?: string;
+  acknowledgedBy?: string;
 };
 
 const tableHeaderStyle = {
@@ -560,7 +563,7 @@ export default function MetricsDashboard() {
                       </td>
                       <td style={tableCellStyle}>
                         {alert.acknowledgedAt
-                          ? new Date(alert.acknowledgedAt).toLocaleString()
+                          ? `Acknowledged by ${alert.acknowledgedBy || "Unknown operator"} at ${new Date(alert.acknowledgedAt).toLocaleString()}`
                           : "Not acknowledged"}
                       </td>
                       <td style={tableCellStyle}>
@@ -755,6 +758,7 @@ export default function MetricsDashboard() {
                     <th style={tableHeaderStyle}>Threshold</th>
                     <th style={tableHeaderStyle}>Window</th>
                     <th style={tableHeaderStyle}>Triggered</th>
+                    <th style={tableHeaderStyle}>Last ACKed</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -777,6 +781,11 @@ export default function MetricsDashboard() {
                       <td style={tableCellStyle}>{alert.windowSeconds}s</td>
                       <td style={tableCellStyle}>
                         {new Date(alert.triggeredAt).toLocaleString()}
+                      </td>
+                      <td style={tableCellStyle}>
+                        {alert.acknowledgedAt
+                          ? `Acknowledged by ${alert.acknowledgedBy || "Unknown operator"} at ${new Date(alert.acknowledgedAt).toLocaleString()}`
+                          : "Not acknowledged"}
                       </td>
                     </tr>
                   ))}

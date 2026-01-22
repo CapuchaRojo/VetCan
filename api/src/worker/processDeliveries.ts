@@ -97,14 +97,23 @@ export async function processEscalationDeliveries() {
       continue;
     }
 
+    const attemptNumber = delivery.attemptCount + 1;
+    const attemptStartedAt = new Date();
+
+    await prisma.escalationDelivery.update({
+      where: { id: delivery.id },
+      data: {
+        attemptCount: attemptNumber,
+        lastAttemptAt: attemptStartedAt,
+      },
+    });
+
     const payload = parsePayload(delivery.event.payload);
     if (!payload) {
       await prisma.escalationDelivery.update({
         where: { id: delivery.id },
         data: {
           status: "failed",
-          attemptCount: delivery.attemptCount + 1,
-          lastAttemptAt: new Date(),
           lastError: "invalid_payload",
         },
       });
@@ -116,9 +125,7 @@ export async function processEscalationDeliveries() {
       await prisma.escalationDelivery.update({
         where: { id: delivery.id },
         data: {
-          status: "sent",
-          attemptCount: delivery.attemptCount + 1,
-          lastAttemptAt: new Date(),
+          status: "delivered",
           lastError: null,
           sentAt: new Date(),
         },
@@ -128,8 +135,6 @@ export async function processEscalationDeliveries() {
         where: { id: delivery.id },
         data: {
           status: "failed",
-          attemptCount: delivery.attemptCount + 1,
-          lastAttemptAt: new Date(),
           lastError: result.error,
         },
       });

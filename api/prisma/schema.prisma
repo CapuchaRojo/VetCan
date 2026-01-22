@@ -146,7 +146,7 @@ model EscalationDelivery {
   // Unique per delivery target + event
   dedupeKey     String   @unique
 
-  // "pending" | "sent" | "failed"
+  // "pending" | "delivered" | "failed" | "canceled"
   status        String   @default("pending")
 
   attemptCount  Int      @default(0)

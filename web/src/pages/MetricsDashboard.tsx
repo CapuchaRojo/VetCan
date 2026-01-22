@@ -281,9 +281,20 @@ export default function MetricsDashboard() {
     acknowledgedAt?: string
   ) {
     const key = `${alertType}:${eventName}`;
-    if (resolvedAlertKeys.has(key)) return "Resolved";
+    if (acknowledgedAt && resolvedAlertKeys.has(key)) return "Resolved";
     if (acknowledgedAt) return "Acknowledged";
+    if (resolvedAlertKeys.has(key)) return "Resolved";
     return "Active";
+  }
+
+  function getResolvedLabel(
+    alertType: string,
+    eventName: string,
+    acknowledgedAt?: string
+  ) {
+    const key = `${alertType}:${eventName}`;
+    if (!resolvedAlertKeys.has(key)) return null;
+    return acknowledgedAt ? "Resolved (after acknowledgment)" : "Auto-resolved";
   }
 
   const todayCount = callbacks.filter(cb => {
@@ -585,21 +596,36 @@ export default function MetricsDashboard() {
                           : "Not acknowledged"}
                       </td>
                       <td style={tableCellStyle}>
-                        <span
-                          style={{
-                            display: "inline-block",
-                            padding: "2px 8px",
-                            borderRadius: "999px",
-                            fontSize: "12px",
-                            background: "#f0ebe4",
-                          }}
-                        >
-                          {getAlertStatus(
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                          <span
+                            style={{
+                              display: "inline-block",
+                              padding: "2px 8px",
+                              borderRadius: "999px",
+                              fontSize: "12px",
+                              background: "#f0ebe4",
+                            }}
+                          >
+                            {getAlertStatus(
+                              alert.alertType,
+                              alert.eventName,
+                              alert.acknowledgedAt
+                            )}
+                          </span>
+                          {getResolvedLabel(
                             alert.alertType,
                             alert.eventName,
                             alert.acknowledgedAt
+                          ) && (
+                            <span style={{ fontSize: "12px", color: "#7b726a" }}>
+                              {getResolvedLabel(
+                                alert.alertType,
+                                alert.eventName,
+                                alert.acknowledgedAt
+                              )}
+                            </span>
                           )}
-                        </span>
+                        </div>
                       </td>
                       <td style={tableCellStyle}>
                         {alert.acknowledgedAt ? (
@@ -823,30 +849,45 @@ export default function MetricsDashboard() {
                           ? `Acknowledged by ${alert.acknowledgedBy || "Unknown operator"} at ${new Date(alert.acknowledgedAt).toLocaleString()}`
                           : "Not acknowledged"}
                       </td>
-                      <td style={tableCellStyle}>
-                        <span
-                          style={{
-                            display: "inline-block",
-                            padding: "2px 8px",
-                            borderRadius: "999px",
-                            fontSize: "12px",
-                            background: "#f0ebe4",
-                          }}
-                        >
-                          {getAlertStatus(
-                            alert.alertType,
-                            alert.eventName,
-                            alert.acknowledgedAt
-                          )}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+                        <td style={tableCellStyle}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            <span
+                              style={{
+                                display: "inline-block",
+                                padding: "2px 8px",
+                                borderRadius: "999px",
+                                fontSize: "12px",
+                                background: "#f0ebe4",
+                              }}
+                            >
+                              {getAlertStatus(
+                                alert.alertType,
+                                alert.eventName,
+                                alert.acknowledgedAt
+                              )}
+                            </span>
+                            {getResolvedLabel(
+                              alert.alertType,
+                              alert.eventName,
+                              alert.acknowledgedAt
+                            ) && (
+                              <span style={{ fontSize: "12px", color: "#7b726a" }}>
+                                {getResolvedLabel(
+                                  alert.alertType,
+                                  alert.eventName,
+                                  alert.acknowledgedAt
+                                )}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
 
         <section style={{ marginTop: "28px" }}>
           <SectionTitle>System Status</SectionTitle>
@@ -927,7 +968,16 @@ export default function MetricsDashboard() {
                 <tbody>
                   {alertEvents.map((event, idx) => (
                     <tr key={`${event.type}-${event.createdAt}-${idx}`}>
-                      <td style={tableCellStyle}>{event.type}</td>
+                      <td style={tableCellStyle}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                          <span>{event.type}</span>
+                          {event.type === "alert_resolved" && (
+                            <span style={{ fontSize: "12px", color: "#7b726a" }}>
+                              Resolved at {new Date(event.createdAt).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td style={tableCellStyle}>
                         {new Date(event.createdAt).toLocaleString()}
                       </td>

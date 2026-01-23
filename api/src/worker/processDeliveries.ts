@@ -192,9 +192,14 @@ export async function processEscalationDeliveries() {
     take: batchSize,
   });
 
-  if (deliveries.length === 0) return;
+  const nowMs = Date.now();
+  if (deliveries.length === 0) {
+    logger.info("[deliveries] skipped: none_pending", { nowMs });
+    return;
+  }
 
-  const now = Date.now();
+  const { failureThreshold, openMs } = getBreakerConfig();
+  let loggedBreakerOpen = false;
 
   for (const delivery of deliveries) {
     const backoffMs = computeBackoffMs(delivery.attemptCount);
@@ -202,11 +207,40 @@ export async function processEscalationDeliveries() {
       ? delivery.lastAttemptAt.getTime()
       : null;
 
-    if (lastAttempt && lastAttempt + backoffMs > now) {
+    if (lastAttempt && lastAttempt + backoffMs > nowMs) {
+      logger.info("[deliveries] skipped: backoff", {
+        deliveryId: delivery.id,
+        eventId: delivery.eventId,
+        dedupeKey: delivery.dedupeKey,
+        attemptCount: delivery.attemptCount,
+        nowMs,
+        lastAttemptAt: lastAttempt,
+        nextEligibleAt: lastAttempt + backoffMs,
+        backoffMs,
+      });
       continue;
     }
 
-    if (!canAttempt(now)) {
+    if (!loggedBreakerOpen && breaker.state === "OPEN") {
+      const openedAtMs = breaker.openedAt?.getTime();
+      const openUntilMs =
+        openedAtMs !== undefined ? openedAtMs + openMs : null;
+      const remainingMs =
+        openUntilMs !== null ? Math.max(0, openUntilMs - nowMs) : null;
+      if (openedAtMs !== undefined && openedAtMs + openMs > nowMs) {
+        logger.warn("[deliveries] skipped: breaker_open", {
+          nowMs,
+          openUntilMs,
+          remainingMs,
+          failureCount: breaker.consecutiveFailures,
+          threshold: failureThreshold,
+          openMs,
+        });
+        loggedBreakerOpen = true;
+      }
+    }
+
+    if (!canAttempt(nowMs)) {
       continue;
     }
 
@@ -226,6 +260,13 @@ export async function processEscalationDeliveries() {
     const payload = parsePayload(delivery.event.payload);
     if (!payload) {
       onFailure(Date.now());
+      logger.warn("[deliveries] failed", {
+        deliveryId: delivery.id,
+        eventId: delivery.eventId,
+        attempt: attemptNumber,
+        error: "invalid_payload",
+        statusTextOrBodyIfAvailable: "invalid_payload",
+      });
       await prisma.escalationDelivery.update({
         where: { id: delivery.id },
         data: {
@@ -236,9 +277,21 @@ export async function processEscalationDeliveries() {
       continue;
     }
 
+    logger.info("[deliveries] attempting", {
+      deliveryId: delivery.id,
+      eventId: delivery.eventId,
+      dedupeKey: delivery.dedupeKey,
+      attempt: attemptNumber,
+    });
+
     const result = await dispatchToN8n(payload);
     if (result.ok) {
       onSuccess();
+      logger.info("[deliveries] delivered", {
+        deliveryId: delivery.id,
+        eventId: delivery.eventId,
+        attempt: attemptNumber,
+      });
       await prisma.escalationDelivery.update({
         where: { id: delivery.id },
         data: {
@@ -249,6 +302,13 @@ export async function processEscalationDeliveries() {
       });
     } else {
       onFailure(Date.now());
+      logger.warn("[deliveries] failed", {
+        deliveryId: delivery.id,
+        eventId: delivery.eventId,
+        attempt: attemptNumber,
+        error: result.error,
+        statusTextOrBodyIfAvailable: result.error,
+      });
       await prisma.escalationDelivery.update({
         where: { id: delivery.id },
         data: {

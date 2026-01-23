@@ -6,12 +6,121 @@ const DEFAULT_BASE_MS = 5_000;
 const DEFAULT_MAX_MS = 5 * 60_000;
 const DEFAULT_JITTER_MS = 1_000;
 const DEFAULT_BATCH_SIZE = 20;
+const DEFAULT_BREAKER_FAILURE_THRESHOLD = 3;
+const DEFAULT_BREAKER_OPEN_MS = 60_000;
+const DEFAULT_BREAKER_HALF_OPEN_MAX_PROBES = 1;
+const DEFAULT_BREAKER_LOG_MS = 10_000;
+
+type BreakerState = "CLOSED" | "OPEN" | "HALF_OPEN";
+
+const breaker = {
+  state: "CLOSED" as BreakerState,
+  consecutiveFailures: 0,
+  openedAt: null as Date | null,
+  halfOpenProbeInFlight: false,
+  lastDeniedLogAt: 0,
+};
 
 function getNumberEnv(key: string, fallback: number) {
   const raw = process.env[key];
   if (!raw) return fallback;
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function getBreakerConfig() {
+  return {
+    failureThreshold: getNumberEnv(
+      "ESCALATION_BREAKER_FAILURE_THRESHOLD",
+      DEFAULT_BREAKER_FAILURE_THRESHOLD
+    ),
+    openMs: getNumberEnv(
+      "ESCALATION_BREAKER_OPEN_MS",
+      DEFAULT_BREAKER_OPEN_MS
+    ),
+    halfOpenMaxProbes: getNumberEnv(
+      "ESCALATION_BREAKER_HALF_OPEN_MAX_PROBES",
+      DEFAULT_BREAKER_HALF_OPEN_MAX_PROBES
+    ),
+    logMs: getNumberEnv("ESCALATION_BREAKER_LOG_MS", DEFAULT_BREAKER_LOG_MS),
+  };
+}
+
+function logBreakerDenied(now: number) {
+  const { logMs } = getBreakerConfig();
+  if (now - breaker.lastDeniedLogAt < logMs) return;
+  breaker.lastDeniedLogAt = now;
+  logger.warn("[deliveries] breaker open; dispatch skipped.");
+}
+
+function openBreaker(now: number) {
+  const { failureThreshold, openMs } = getBreakerConfig();
+  breaker.state = "OPEN";
+  breaker.openedAt = new Date(now);
+  breaker.consecutiveFailures = 0;
+  breaker.halfOpenProbeInFlight = false;
+  logger.warn(
+    `[deliveries] breaker opened (threshold ${failureThreshold}, open ${openMs}ms)`
+  );
+}
+
+function canAttempt(now: number) {
+  const { openMs, halfOpenMaxProbes } = getBreakerConfig();
+
+  if (breaker.state === "OPEN") {
+    if (breaker.openedAt && now - breaker.openedAt.getTime() < openMs) {
+      logBreakerDenied(now);
+      return false;
+    }
+    breaker.state = "HALF_OPEN";
+    breaker.halfOpenProbeInFlight = false;
+  }
+
+  if (breaker.state === "HALF_OPEN") {
+    if (breaker.halfOpenProbeInFlight) {
+      logBreakerDenied(now);
+      return false;
+    }
+    if (halfOpenMaxProbes <= 0) {
+      logBreakerDenied(now);
+      return false;
+    }
+    breaker.halfOpenProbeInFlight = true;
+    return true;
+  }
+
+  return true;
+}
+
+function onSuccess() {
+  if (breaker.state !== "CLOSED") {
+    logger.info("[deliveries] breaker closed");
+  }
+  breaker.state = "CLOSED";
+  breaker.consecutiveFailures = 0;
+  breaker.openedAt = null;
+  breaker.halfOpenProbeInFlight = false;
+}
+
+function onFailure(now: number) {
+  if (breaker.state === "HALF_OPEN") {
+    openBreaker(now);
+    return;
+  }
+
+  breaker.consecutiveFailures += 1;
+  const { failureThreshold } = getBreakerConfig();
+  if (breaker.consecutiveFailures >= failureThreshold) {
+    openBreaker(now);
+  }
+}
+
+export function resetBreakerForTests() {
+  breaker.state = "CLOSED";
+  breaker.consecutiveFailures = 0;
+  breaker.openedAt = null;
+  breaker.halfOpenProbeInFlight = false;
+  breaker.lastDeniedLogAt = 0;
 }
 
 function computeBackoffMs(attemptCount: number) {
@@ -97,12 +206,18 @@ export async function processEscalationDeliveries() {
       continue;
     }
 
+    if (!canAttempt(now)) {
+      continue;
+    }
+
     const attemptNumber = delivery.attemptCount + 1;
     const attemptStartedAt = new Date();
 
     await prisma.escalationDelivery.update({
       where: { id: delivery.id },
       data: {
+        status: "failed",
+        lastError: "invalid_payload",
         attemptCount: attemptNumber,
         lastAttemptAt: attemptStartedAt,
       },
@@ -110,6 +225,7 @@ export async function processEscalationDeliveries() {
 
     const payload = parsePayload(delivery.event.payload);
     if (!payload) {
+      onFailure(Date.now());
       await prisma.escalationDelivery.update({
         where: { id: delivery.id },
         data: {
@@ -122,6 +238,7 @@ export async function processEscalationDeliveries() {
 
     const result = await dispatchToN8n(payload);
     if (result.ok) {
+      onSuccess();
       await prisma.escalationDelivery.update({
         where: { id: delivery.id },
         data: {
@@ -131,6 +248,7 @@ export async function processEscalationDeliveries() {
         },
       });
     } else {
+      onFailure(Date.now());
       await prisma.escalationDelivery.update({
         where: { id: delivery.id },
         data: {

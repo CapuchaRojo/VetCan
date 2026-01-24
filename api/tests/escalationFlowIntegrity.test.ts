@@ -500,4 +500,132 @@ const snapshot = snapshots[0];
       expect(dailyCount).toBeGreaterThan(0);
     });
   });
+
+  describe("E. n8n Metrics Signaling", () => {
+    it("emits payload when snapshot triggers", async () => {
+      process.env.ESCALATION_METRICS_SNAPSHOT_MS = "1";
+      process.env.N8N_METRICS_WEBHOOK_URL = "http://example.com/metrics";
+
+      const nowMs = Date.UTC(2026, 0, 24, 14, 0, 0);
+      jest.spyOn(Date, "now").mockReturnValue(nowMs);
+
+      escalationMetrics.counters.attempted = 2;
+      escalationMetrics.counters.delivered = 1;
+      escalationMetrics.counters.failed = 1;
+      escalationMetrics.counters.skippedBreaker = 3;
+      escalationMetrics.counters.skippedBackoff = 4;
+      escalationMetrics.counters.skippedNonePending = 5;
+
+      const fetchMock = jest.fn().mockResolvedValue({ ok: true });
+      global.fetch = fetchMock as any;
+
+      const originalCreate = prisma.escalationMetricsSnapshot.create.bind(
+        prisma.escalationMetricsSnapshot
+      );
+      let snapshotWrite: Promise<unknown> | null = null;
+      const createSpy = jest
+        .spyOn(prisma.escalationMetricsSnapshot, "create")
+        .mockImplementation((args: any) => {
+          const promise = originalCreate(args);
+          snapshotWrite = promise;
+          return promise;
+        });
+
+      await processEscalationDeliveries();
+
+      if (snapshotWrite) {
+        await snapshotWrite;
+      }
+
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, options] = fetchMock.mock.calls[0];
+      expect(url).toBe("http://example.com/metrics");
+      expect(options?.method).toBe("POST");
+
+      const payload = JSON.parse(options?.body as string);
+      expect(payload.type).toBe("vetcan.escalation_metrics");
+      expect(payload.source).toBe("vetcan-worker");
+      expect(payload.nowMs).toBe(nowMs);
+      expect(payload.emittedAt).toBe(new Date(nowMs).toISOString());
+      expect(payload.counters).toEqual({
+        attempted: 2,
+        delivered: 1,
+        failed: 1,
+        skippedBreaker: 3,
+        skippedBackoff: 4,
+        skippedNonePending: 5,
+      });
+      expect(payload.breaker.state).toBe("CLOSED");
+      expect(payload.snapshot.source).toBe("worker");
+      expect(payload.buckets.utcHourStartMs).toBe(
+        Date.UTC(2026, 0, 24, 14, 0, 0)
+      );
+      expect(payload.buckets.utcDayStartMs).toBe(
+        Date.UTC(2026, 0, 24, 0, 0, 0)
+      );
+
+      createSpy.mockRestore();
+    });
+
+    it("does not affect delivery outcome when metrics dispatch fails", async () => {
+      process.env.ESCALATION_METRICS_SNAPSHOT_MS = "1";
+      process.env.N8N_METRICS_WEBHOOK_URL = "http://example.com/metrics";
+      process.env.N8N_ALERT_WEBHOOK_URL = "http://example.com/alerts";
+
+      const nowMs = Date.UTC(2026, 0, 24, 14, 10, 0);
+      jest.spyOn(Date, "now").mockReturnValue(nowMs);
+
+      const fetchMock = jest.fn().mockImplementation((url: string) => {
+        if (url.includes("metrics")) {
+          throw new Error("n8n down");
+        }
+        return Promise.resolve({ ok: true });
+      });
+      global.fetch = fetchMock as any;
+
+      const event = await prisma.operationalEvent.create({
+        data: {
+          eventName: "alert_escalation_requested",
+          environment: "test",
+          payload: "{}",
+        },
+      });
+
+      const delivery = await prisma.escalationDelivery.create({
+        data: {
+          event: { connect: { id: event.id } },
+          dedupeKey: `alert_escalation_requested:${event.id}:info`,
+          status: "pending",
+        },
+      });
+
+      await processEscalationDeliveries();
+
+      const updated = await prisma.escalationDelivery.findUnique({
+        where: { id: delivery.id },
+      });
+
+      expect(updated?.status).toBe("delivered");
+      expect(updated?.attemptCount).toBe(1);
+    });
+
+    it("is env-guarded when webhook is missing", async () => {
+      process.env.ESCALATION_METRICS_SNAPSHOT_MS = "1";
+      delete process.env.N8N_METRICS_WEBHOOK_URL;
+
+      const nowMs = Date.UTC(2026, 0, 24, 14, 20, 0);
+      jest.spyOn(Date, "now").mockReturnValue(nowMs);
+
+      const fetchMock = jest.fn().mockResolvedValue({ ok: true });
+      global.fetch = fetchMock as any;
+
+      await processEscalationDeliveries();
+
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
 });

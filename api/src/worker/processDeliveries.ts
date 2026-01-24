@@ -75,6 +75,10 @@ function getRetentionDays() {
   );
 }
 
+function getMetricsWebhookUrl() {
+  return process.env.N8N_METRICS_WEBHOOK_URL ?? "";
+}
+
 function logBreakerDenied(now: number) {
   const { logMs } = getBreakerConfig();
   if (now - breaker.lastDeniedLogAt < logMs) return;
@@ -168,12 +172,48 @@ export function getEscalationBreakerSnapshot(nowMs: number) {
   };
 }
 
+function getUtcHourStart(ms: number) {
+  const date = new Date(ms);
+  return Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    date.getUTCHours()
+  );
+}
+
+async function dispatchMetricsToN8n(payload: unknown) {
+  const url = getMetricsWebhookUrl();
+  if (!url) return;
+
+  const fetchFn = globalThis.fetch;
+  if (!fetchFn) return;
+
+  try {
+    const res = await fetchFn(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload ?? {}),
+    });
+
+    if (!res.ok) {
+      logger.warn("[metrics] n8n metrics dispatch failed", {
+        status: res.status,
+      });
+    }
+  } catch (err) {
+    logger.warn("[metrics] n8n metrics dispatch failed", {
+      error: (err as Error).message,
+    });
+  }
+}
+
 export async function captureEscalationMetricsSnapshot(nowMs: number) {
   try {
     const counters = escalationMetrics.counters;
     const breakerSnapshot = getEscalationBreakerSnapshot(nowMs);
 
-    await prisma.escalationMetricsSnapshot.create({
+    const snapshot = await prisma.escalationMetricsSnapshot.create({
       data: {
         attempted: counters.attempted,
         delivered: counters.delivered,
@@ -195,6 +235,33 @@ export async function captureEscalationMetricsSnapshot(nowMs: number) {
         source: "worker",
       },
     });
+
+    const payload = {
+      type: "vetcan.escalation_metrics",
+      source: "vetcan-worker",
+      emittedAt: new Date(nowMs).toISOString(),
+      nowMs,
+      counters: {
+        attempted: counters.attempted,
+        delivered: counters.delivered,
+        failed: counters.failed,
+        skippedBreaker: counters.skippedBreaker,
+        skippedBackoff: counters.skippedBackoff,
+        skippedNonePending: counters.skippedNonePending,
+      },
+      breaker: breakerSnapshot,
+      snapshot: {
+        id: snapshot.id,
+        createdAt: snapshot.createdAt.toISOString(),
+        source: "worker",
+      },
+      buckets: {
+        utcHourStartMs: getUtcHourStart(nowMs),
+        utcDayStartMs: getUtcDayStart(nowMs),
+      },
+    };
+
+    void dispatchMetricsToN8n(payload);
 
     logger.info("[metrics] escalation snapshot written", {
       nowMs,

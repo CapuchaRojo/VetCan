@@ -231,7 +231,16 @@ describe("Escalation Flow Integrity Matrix", () => {
       orderBy: { createdAt: "desc" },
     });
 
-    expect(snapshots).toHaveLength(0);
+    expect(snapshots).toHaveLength(1);
+
+const snapshot = snapshots[0];
+    expect(snapshot.attempted).toBe(4);
+    expect(snapshot.delivered).toBe(2);
+    expect(snapshot.failed).toBe(1);
+    expect(snapshot.skippedBreaker).toBe(3);
+    expect(snapshot.skippedBackoff).toBe(5);
+    expect(snapshot.skippedNonePending).toBe(7);
+    expect(snapshot.breakerState).toBe("CLOSED");;
   });
 });
             

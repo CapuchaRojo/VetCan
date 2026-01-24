@@ -3,6 +3,7 @@ import prisma from '../../src/prisma';
 
 export async function resetDb() {
   // Order matters: children → parents
+  await prisma.escalationMetricsSnapshot.deleteMany();
   await prisma.escalationDelivery.deleteMany();
   await prisma.operationalEvent.deleteMany();
   await prisma.call.deleteMany();

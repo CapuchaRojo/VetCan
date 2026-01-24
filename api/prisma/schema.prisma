@@ -158,3 +158,23 @@ model EscalationDelivery {
 
   @@index([status, lastAttemptAt])
 }
+
+model EscalationMetricsSnapshot {
+  id                     String   @id @default(cuid())
+  createdAt              DateTime @default(now())
+
+  attempted              Int
+  delivered              Int
+  failed                 Int
+  skippedBreaker         Int
+  skippedBackoff         Int
+  skippedNonePending     Int
+
+  breakerState           String
+  breakerFailureCount    Int
+  breakerOpenedAt        DateTime?
+  breakerOpenUntil       DateTime?
+  breakerRemainingMs     Int?
+
+  source                 String
+}

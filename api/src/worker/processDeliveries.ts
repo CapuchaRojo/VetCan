@@ -11,6 +11,7 @@ const DEFAULT_BREAKER_FAILURE_THRESHOLD = 3;
 const DEFAULT_BREAKER_OPEN_MS = 60_000;
 const DEFAULT_BREAKER_HALF_OPEN_MAX_PROBES = 1;
 const DEFAULT_BREAKER_LOG_MS = 10_000;
+const DEFAULT_METRICS_SNAPSHOT_MS = 60_000;
 
 type BreakerState = "CLOSED" | "OPEN" | "HALF_OPEN";
 
@@ -21,6 +22,16 @@ const breaker = {
   halfOpenProbeInFlight: false,
   lastDeniedLogAt: 0,
 };
+
+let lastSnapshotAtMs = 0;
+
+function resetBreakerState() {
+  breaker.state = "CLOSED";
+  breaker.consecutiveFailures = 0;
+  breaker.openedAt = null;
+  breaker.halfOpenProbeInFlight = false;
+  breaker.lastDeniedLogAt = 0;
+}
 
 function getNumberEnv(key: string, fallback: number) {
   const raw = process.env[key];
@@ -45,6 +56,13 @@ function getBreakerConfig() {
     ),
     logMs: getNumberEnv("ESCALATION_BREAKER_LOG_MS", DEFAULT_BREAKER_LOG_MS),
   };
+}
+
+function getSnapshotIntervalMs() {
+  return getNumberEnv(
+    "ESCALATION_METRICS_SNAPSHOT_MS",
+    DEFAULT_METRICS_SNAPSHOT_MS
+  );
 }
 
 function logBreakerDenied(now: number) {
@@ -117,11 +135,7 @@ function onFailure(now: number) {
 }
 
 export function resetBreakerForTests() {
-  breaker.state = "CLOSED";
-  breaker.consecutiveFailures = 0;
-  breaker.openedAt = null;
-  breaker.halfOpenProbeInFlight = false;
-  breaker.lastDeniedLogAt = 0;
+  resetBreakerState();
 }
 
 export function getEscalationBreakerSnapshot(nowMs: number) {
@@ -138,6 +152,83 @@ export function getEscalationBreakerSnapshot(nowMs: number) {
     openUntilMs,
     remainingOpenMs,
   };
+}
+
+export async function captureEscalationMetricsSnapshot(nowMs: number) {
+  try {
+    const counters = escalationMetrics.counters;
+    const breakerSnapshot = getEscalationBreakerSnapshot(nowMs);
+
+    await prisma.escalationMetricsSnapshot.create({
+      data: {
+        attempted: counters.attempted,
+        delivered: counters.delivered,
+        failed: counters.failed,
+        skippedBreaker: counters.skippedBreaker,
+        skippedBackoff: counters.skippedBackoff,
+        skippedNonePending: counters.skippedNonePending,
+        breakerState: breakerSnapshot.state,
+        breakerFailureCount: breakerSnapshot.failureCount,
+        breakerOpenedAt:
+          breakerSnapshot.openedAtMs === null
+            ? null
+            : new Date(breakerSnapshot.openedAtMs),
+        breakerOpenUntil:
+          breakerSnapshot.openUntilMs === null
+            ? null
+            : new Date(breakerSnapshot.openUntilMs),
+        breakerRemainingMs: breakerSnapshot.remainingOpenMs,
+        source: "worker",
+      },
+    });
+
+    logger.info("[metrics] escalation snapshot written", {
+      nowMs,
+      breakerState: breakerSnapshot.state,
+      countersSummary: {
+        attempted: counters.attempted,
+        delivered: counters.delivered,
+        failed: counters.failed,
+      },
+    });
+  } catch (err) {
+    logger.warn("[metrics] escalation snapshot failed", {
+      nowMs,
+      error: (err as Error).message,
+    });
+  }
+}
+
+function shouldCaptureSnapshot(nowMs: number) {
+  const intervalMs = getSnapshotIntervalMs();
+  if (intervalMs <= 0) return false;
+  if (nowMs - lastSnapshotAtMs < intervalMs) return false;
+  lastSnapshotAtMs = nowMs;
+  return true;
+}
+
+export function resetEscalationBreakerForOps(nowMs = Date.now()) {
+  const before = getEscalationBreakerSnapshot(nowMs);
+  resetBreakerState();
+  const after = getEscalationBreakerSnapshot(nowMs);
+  return { before, after };
+}
+
+export function setBreakerStateForTests(params: {
+  state: BreakerState;
+  consecutiveFailures?: number;
+  openedAtMs?: number | null;
+  halfOpenProbeInFlight?: boolean;
+  lastDeniedLogAt?: number;
+}) {
+  breaker.state = params.state;
+  breaker.consecutiveFailures = params.consecutiveFailures ?? 0;
+  breaker.openedAt =
+    params.openedAtMs === null || params.openedAtMs === undefined
+      ? null
+      : new Date(params.openedAtMs);
+  breaker.halfOpenProbeInFlight = params.halfOpenProbeInFlight ?? false;
+  breaker.lastDeniedLogAt = params.lastDeniedLogAt ?? 0;
 }
 
 function computeBackoffMs(attemptCount: number) {
@@ -210,6 +301,9 @@ export async function processEscalationDeliveries() {
   });
 
   const nowMs = Date.now();
+  if (shouldCaptureSnapshot(nowMs)) {
+    void captureEscalationMetricsSnapshot(nowMs);
+  }
   if (deliveries.length === 0) {
     logger.info("[deliveries] skipped: none_pending", { nowMs });
     escalationMetrics.counters.skippedNonePending += 1;

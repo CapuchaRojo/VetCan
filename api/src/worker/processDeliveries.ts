@@ -144,6 +144,10 @@ function onFailure(now: number) {
   }
 }
 
+export function resetMetricsTimersForTests() {
+  lastSnapshotAtMs = 0;
+  lastCompactionAtMs = 0;
+}
 export function resetBreakerForTests() {
   resetBreakerState();
 }

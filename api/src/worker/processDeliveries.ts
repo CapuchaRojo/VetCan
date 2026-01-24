@@ -508,14 +508,24 @@ export async function processEscalationDeliveries() {
     orderBy: { createdAt: "asc" },
     take: batchSize,
   });
-
   const nowMs = Date.now();
-  if (shouldCaptureSnapshot(nowMs)) {
-    void captureEscalationMetricsSnapshot(nowMs);
+  const isTest = process.env.NODE_ENV === "test";
+    if (shouldCaptureSnapshot(nowMs)) {
+    if (isTest) {
+      await captureEscalationMetricsSnapshot(nowMs);
+    } else {
+      void captureEscalationMetricsSnapshot(nowMs);
+    }
   }
+
   if (shouldRunCompaction(nowMs)) {
-    void compactEscalationMetricsSnapshots(nowMs);
+    if (isTest) {
+      await compactEscalationMetricsSnapshots(nowMs);
+    } else {
+      void compactEscalationMetricsSnapshots(nowMs);
+    }
   }
+
   if (deliveries.length === 0) {
     logger.info("[deliveries] skipped: none_pending", { nowMs });
     escalationMetrics.counters.skippedNonePending += 1;

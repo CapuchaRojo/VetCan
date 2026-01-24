@@ -1,4 +1,5 @@
 import prisma from "../prisma";
+import { Prisma } from "@prisma/client";
 import { logger } from "../utils/logger";
 import { escalationMetrics } from "./escalationMetrics";
 
@@ -12,6 +13,7 @@ const DEFAULT_BREAKER_OPEN_MS = 60_000;
 const DEFAULT_BREAKER_HALF_OPEN_MAX_PROBES = 1;
 const DEFAULT_BREAKER_LOG_MS = 10_000;
 const DEFAULT_METRICS_SNAPSHOT_MS = 60_000;
+const DEFAULT_METRICS_RETENTION_DAYS = 14;
 
 type BreakerState = "CLOSED" | "OPEN" | "HALF_OPEN";
 
@@ -24,6 +26,7 @@ const breaker = {
 };
 
 let lastSnapshotAtMs = 0;
+let lastCompactionAtMs = 0;
 
 function resetBreakerState() {
   breaker.state = "CLOSED";
@@ -62,6 +65,13 @@ function getSnapshotIntervalMs() {
   return getNumberEnv(
     "ESCALATION_METRICS_SNAPSHOT_MS",
     DEFAULT_METRICS_SNAPSHOT_MS
+  );
+}
+
+function getRetentionDays() {
+  return getNumberEnv(
+    "ESCALATION_METRICS_RETENTION_DAYS",
+    DEFAULT_METRICS_RETENTION_DAYS
   );
 }
 
@@ -207,6 +217,199 @@ function shouldCaptureSnapshot(nowMs: number) {
   return true;
 }
 
+function getUtcDayStart(ms: number) {
+  const date = new Date(ms);
+  return Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate()
+  );
+}
+
+function resolveDbProvider() {
+  const url = process.env.DATABASE_URL ?? "";
+  if (url.startsWith("postgres")) return "postgres";
+  if (url.startsWith("file:")) return "sqlite";
+  if (url.startsWith("sqlite")) return "sqlite";
+  return "postgres";
+}
+
+function coerceBucketDate(value: Date | string) {
+  if (value instanceof Date) return value;
+  const hasTz = /[zZ]|[+-]\\d\\d:\\d\\d$/.test(value);
+  return new Date(hasTz ? value : `${value}Z`);
+}
+
+type RollupRow = {
+  bucket: Date | string;
+  attempted: unknown;
+  delivered: unknown;
+  failed: unknown;
+  skippedBreaker: unknown;
+  skippedBackoff: unknown;
+  skippedNonePending: unknown;
+  breakerOpenCount: unknown;
+};
+
+async function fetchRollupRows(
+  grain: "hour" | "day",
+  range: { gte?: Date; lt?: Date }
+) {
+  const provider = resolveDbProvider();
+  const conditions: Prisma.Sql[] = [];
+  if (range.gte) {
+    conditions.push(Prisma.sql`"createdAt" >= ${range.gte}`);
+  }
+  if (range.lt) {
+    conditions.push(Prisma.sql`"createdAt" < ${range.lt}`);
+  }
+  const whereSql =
+    conditions.length > 0
+      ? Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}`
+      : Prisma.sql``;
+
+  if (provider === "sqlite") {
+    const format =
+      grain === "hour" ? "%Y-%m-%d %H:00:00" : "%Y-%m-%d 00:00:00";
+    const bucketExpr = Prisma.sql`strftime(${format}, "createdAt")`;
+    return prisma.$queryRaw<RollupRow[]>(Prisma.sql`
+      SELECT
+        ${bucketExpr} AS bucket,
+        SUM("attempted") AS attempted,
+        SUM("delivered") AS delivered,
+        SUM("failed") AS failed,
+        SUM("skippedBreaker") AS skippedBreaker,
+        SUM("skippedBackoff") AS skippedBackoff,
+        SUM("skippedNonePending") AS skippedNonePending,
+        SUM(CASE WHEN "breakerState" = 'OPEN' THEN 1 ELSE 0 END) AS breakerOpenCount
+      FROM "EscalationMetricsSnapshot"
+      ${whereSql}
+      GROUP BY bucket
+    `);
+  }
+
+  const bucketExpr = Prisma.sql`date_trunc(${grain}, "createdAt")`;
+  return prisma.$queryRaw<RollupRow[]>(Prisma.sql`
+    SELECT
+      ${bucketExpr} AS bucket,
+      SUM("attempted")::int AS attempted,
+      SUM("delivered")::int AS delivered,
+      SUM("failed")::int AS failed,
+      SUM("skippedBreaker")::int AS skippedBreaker,
+      SUM("skippedBackoff")::int AS skippedBackoff,
+      SUM("skippedNonePending")::int AS skippedNonePending,
+      SUM(CASE WHEN "breakerState" = 'OPEN' THEN 1 ELSE 0 END)::int AS breakerOpenCount
+    FROM "EscalationMetricsSnapshot"
+    ${whereSql}
+    GROUP BY bucket
+  `);
+}
+
+async function upsertHourlyRollups(rows: RollupRow[]) {
+  for (const row of rows) {
+    const hourStart = coerceBucketDate(row.bucket);
+    await prisma.escalationMetricsRollupHourly.upsert({
+      where: { hourStart },
+      create: {
+        hourStart,
+        attempted: Number(row.attempted ?? 0),
+        delivered: Number(row.delivered ?? 0),
+        failed: Number(row.failed ?? 0),
+        skippedBreaker: Number(row.skippedBreaker ?? 0),
+        skippedBackoff: Number(row.skippedBackoff ?? 0),
+        skippedNonePending: Number(row.skippedNonePending ?? 0),
+        breakerOpenCount: Number(row.breakerOpenCount ?? 0),
+      },
+      update: {
+        attempted: Number(row.attempted ?? 0),
+        delivered: Number(row.delivered ?? 0),
+        failed: Number(row.failed ?? 0),
+        skippedBreaker: Number(row.skippedBreaker ?? 0),
+        skippedBackoff: Number(row.skippedBackoff ?? 0),
+        skippedNonePending: Number(row.skippedNonePending ?? 0),
+        breakerOpenCount: Number(row.breakerOpenCount ?? 0),
+      },
+    });
+  }
+}
+
+async function upsertDailyRollups(rows: RollupRow[]) {
+  for (const row of rows) {
+    const dayStart = coerceBucketDate(row.bucket);
+    await prisma.escalationMetricsRollupDaily.upsert({
+      where: { dayStart },
+      create: {
+        dayStart,
+        attempted: Number(row.attempted ?? 0),
+        delivered: Number(row.delivered ?? 0),
+        failed: Number(row.failed ?? 0),
+        skippedBreaker: Number(row.skippedBreaker ?? 0),
+        skippedBackoff: Number(row.skippedBackoff ?? 0),
+        skippedNonePending: Number(row.skippedNonePending ?? 0),
+        breakerOpenCount: Number(row.breakerOpenCount ?? 0),
+      },
+      update: {
+        attempted: Number(row.attempted ?? 0),
+        delivered: Number(row.delivered ?? 0),
+        failed: Number(row.failed ?? 0),
+        skippedBreaker: Number(row.skippedBreaker ?? 0),
+        skippedBackoff: Number(row.skippedBackoff ?? 0),
+        skippedNonePending: Number(row.skippedNonePending ?? 0),
+        breakerOpenCount: Number(row.breakerOpenCount ?? 0),
+      },
+    });
+  }
+}
+
+export async function compactEscalationMetricsSnapshots(nowMs: number) {
+  try {
+    const retentionDays = getRetentionDays();
+    if (retentionDays <= 0) return;
+
+    const cutoffDayStartMs = getUtcDayStart(
+      nowMs - retentionDays * 24 * 60 * 60 * 1000
+    );
+    const cutoffDate = new Date(cutoffDayStartMs);
+
+    const expiredHourly = await fetchRollupRows("hour", { lt: cutoffDate });
+    const expiredDaily = await fetchRollupRows("day", { lt: cutoffDate });
+
+    await upsertHourlyRollups(expiredHourly);
+    await upsertDailyRollups(expiredDaily);
+
+    const recentHourly = await fetchRollupRows("hour", { gte: cutoffDate });
+    const recentDaily = await fetchRollupRows("day", { gte: cutoffDate });
+
+    await upsertHourlyRollups(recentHourly);
+    await upsertDailyRollups(recentDaily);
+
+    const deleteResult = await prisma.escalationMetricsSnapshot.deleteMany({
+      where: { createdAt: { lt: cutoffDate } },
+    });
+
+    logger.info("[metrics] escalation rollups updated", {
+      nowMs,
+      cutoffDayStartMs,
+      hourlyBuckets: expiredHourly.length + recentHourly.length,
+      dailyBuckets: expiredDaily.length + recentDaily.length,
+      deletedSnapshots: deleteResult.count,
+    });
+  } catch (err) {
+    logger.warn("[metrics] escalation rollups failed", {
+      nowMs,
+      error: (err as Error).message,
+    });
+  }
+}
+
+function shouldRunCompaction(nowMs: number) {
+  const intervalMs = getSnapshotIntervalMs();
+  if (intervalMs <= 0) return false;
+  if (nowMs - lastCompactionAtMs < intervalMs) return false;
+  lastCompactionAtMs = nowMs;
+  return true;
+}
+
 export function resetEscalationBreakerForOps(nowMs = Date.now()) {
   const before = getEscalationBreakerSnapshot(nowMs);
   resetBreakerState();
@@ -303,6 +506,9 @@ export async function processEscalationDeliveries() {
   const nowMs = Date.now();
   if (shouldCaptureSnapshot(nowMs)) {
     void captureEscalationMetricsSnapshot(nowMs);
+  }
+  if (shouldRunCompaction(nowMs)) {
+    void compactEscalationMetricsSnapshots(nowMs);
   }
   if (deliveries.length === 0) {
     logger.info("[deliveries] skipped: none_pending", { nowMs });

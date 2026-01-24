@@ -178,3 +178,31 @@ model EscalationMetricsSnapshot {
 
   source                 String
 }
+
+model EscalationMetricsRollupHourly {
+  id                 String   @id @default(cuid())
+  hourStart          DateTime @unique
+  attempted          Int
+  delivered          Int
+  failed             Int
+  skippedBreaker     Int
+  skippedBackoff     Int
+  skippedNonePending Int
+  breakerOpenCount   Int
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model EscalationMetricsRollupDaily {
+  id                 String   @id @default(cuid())
+  dayStart           DateTime @unique
+  attempted          Int
+  delivered          Int
+  failed             Int
+  skippedBreaker     Int
+  skippedBackoff     Int
+  skippedNonePending Int
+  breakerOpenCount   Int
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}

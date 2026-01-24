@@ -3,6 +3,8 @@ import prisma from '../../src/prisma';
 
 export async function resetDb() {
   // Order matters: children → parents
+  await prisma.escalationMetricsRollupHourly.deleteMany();
+  await prisma.escalationMetricsRollupDaily.deleteMany();
   await prisma.escalationMetricsSnapshot.deleteMany();
   await prisma.escalationDelivery.deleteMany();
   await prisma.operationalEvent.deleteMany();

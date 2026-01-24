@@ -275,13 +275,13 @@ async function fetchRollupRows(
     return prisma.$queryRaw<RollupRow[]>(Prisma.sql`
       SELECT
         ${bucketExpr} AS bucket,
-        SUM("attempted") AS attempted,
-        SUM("delivered") AS delivered,
-        SUM("failed") AS failed,
-        SUM("skippedBreaker") AS skippedBreaker,
-        SUM("skippedBackoff") AS skippedBackoff,
-        SUM("skippedNonePending") AS skippedNonePending,
-        SUM(CASE WHEN "breakerState" = 'OPEN' THEN 1 ELSE 0 END) AS breakerOpenCount
+        SUM("attempted") int AS attempted,
+        SUM("delivered") int AS delivered,
+        SUM("failed") int AS failed,
+        SUM("skippedBackoff") int AS "skippedBackoff",
+        SUM("skippedBreaker") int AS "skippedBreaker",
+        SUM("skippedNonePending") int AS "skippedNonePending",
+        SUM(CASE WHEN "breakerState" = 'OPEN' THEN 1 ELSE 0 END) AS "breakerOpenCount"
       FROM "EscalationMetricsSnapshot"
       ${whereSql}
       GROUP BY bucket
@@ -295,10 +295,10 @@ async function fetchRollupRows(
       SUM("attempted")::int AS attempted,
       SUM("delivered")::int AS delivered,
       SUM("failed")::int AS failed,
-      SUM("skippedBreaker")::int AS skippedBreaker,
-      SUM("skippedBackoff")::int AS skippedBackoff,
-      SUM("skippedNonePending")::int AS skippedNonePending,
-      SUM(CASE WHEN "breakerState" = 'OPEN' THEN 1 ELSE 0 END)::int AS breakerOpenCount
+      SUM("skippedBreaker")::int AS "skippedBreaker",
+      SUM("skippedBackoff")::int AS "skippedBackoff",
+      SUM("skippedNonePending")::int AS "skippedNonePending",
+      SUM(CASE WHEN "breakerState" = 'OPEN' THEN 1 ELSE 0 END)::int AS "breakerOpenCount"
     FROM "EscalationMetricsSnapshot"
     ${whereSql}
     GROUP BY bucket
@@ -336,6 +336,7 @@ async function upsertHourlyRollups(rows: RollupRow[]) {
 async function upsertDailyRollups(rows: RollupRow[]) {
   for (const row of rows) {
     const dayStart = coerceBucketDate(row.bucket);
+
     await prisma.escalationMetricsRollupDaily.upsert({
       where: { dayStart },
       create: {
@@ -360,6 +361,7 @@ async function upsertDailyRollups(rows: RollupRow[]) {
     });
   }
 }
+
 
 export async function compactEscalationMetricsSnapshots(nowMs: number) {
   try {

@@ -1,5 +1,6 @@
 import prisma from "../prisma";
 import { logger } from "../utils/logger";
+import { escalationMetrics } from "./escalationMetrics";
 
 const DEFAULT_MAX_ATTEMPTS = 8;
 const DEFAULT_BASE_MS = 5_000;
@@ -123,6 +124,22 @@ export function resetBreakerForTests() {
   breaker.lastDeniedLogAt = 0;
 }
 
+export function getEscalationBreakerSnapshot(nowMs: number) {
+  const { openMs } = getBreakerConfig();
+  const openedAtMs = breaker.openedAt ? breaker.openedAt.getTime() : null;
+  const openUntilMs = openedAtMs !== null ? openedAtMs + openMs : null;
+  const remainingOpenMs =
+    openUntilMs !== null ? Math.max(0, openUntilMs - nowMs) : null;
+
+  return {
+    state: breaker.state,
+    failureCount: breaker.consecutiveFailures,
+    openedAtMs,
+    openUntilMs,
+    remainingOpenMs,
+  };
+}
+
 function computeBackoffMs(attemptCount: number) {
   const base = getNumberEnv("ESCALATION_RETRY_BASE_MS", DEFAULT_BASE_MS);
   const maxMs = getNumberEnv("ESCALATION_RETRY_MAX_MS", DEFAULT_MAX_MS);
@@ -195,11 +212,13 @@ export async function processEscalationDeliveries() {
   const nowMs = Date.now();
   if (deliveries.length === 0) {
     logger.info("[deliveries] skipped: none_pending", { nowMs });
+    escalationMetrics.counters.skippedNonePending += 1;
     return;
   }
 
   const { failureThreshold, openMs } = getBreakerConfig();
   let loggedBreakerOpen = false;
+  let countedBreakerSkip = false;
 
   for (const delivery of deliveries) {
     const backoffMs = computeBackoffMs(delivery.attemptCount);
@@ -218,6 +237,7 @@ export async function processEscalationDeliveries() {
         nextEligibleAt: lastAttempt + backoffMs,
         backoffMs,
       });
+      escalationMetrics.counters.skippedBackoff += 1;
       continue;
     }
 
@@ -241,6 +261,10 @@ export async function processEscalationDeliveries() {
     }
 
     if (!canAttempt(nowMs)) {
+      if (!countedBreakerSkip) {
+        escalationMetrics.counters.skippedBreaker += 1;
+        countedBreakerSkip = true;
+      }
       continue;
     }
 
@@ -267,6 +291,7 @@ export async function processEscalationDeliveries() {
         error: "invalid_payload",
         statusTextOrBodyIfAvailable: "invalid_payload",
       });
+      escalationMetrics.counters.failed += 1;
       await prisma.escalationDelivery.update({
         where: { id: delivery.id },
         data: {
@@ -283,6 +308,7 @@ export async function processEscalationDeliveries() {
       dedupeKey: delivery.dedupeKey,
       attempt: attemptNumber,
     });
+    escalationMetrics.counters.attempted += 1;
 
     const result = await dispatchToN8n(payload);
     if (result.ok) {
@@ -292,6 +318,7 @@ export async function processEscalationDeliveries() {
         eventId: delivery.eventId,
         attempt: attemptNumber,
       });
+      escalationMetrics.counters.delivered += 1;
       await prisma.escalationDelivery.update({
         where: { id: delivery.id },
         data: {
@@ -309,6 +336,7 @@ export async function processEscalationDeliveries() {
         error: result.error,
         statusTextOrBodyIfAvailable: result.error,
       });
+      escalationMetrics.counters.failed += 1;
       await prisma.escalationDelivery.update({
         where: { id: delivery.id },
         data: {

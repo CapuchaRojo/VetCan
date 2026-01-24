@@ -9,6 +9,7 @@ import smsRouter from "./sms";
 import stats from "./stats";
 import metricsRouter from "./metrics";
 import internalMetricsRouter from "./internalMetrics";
+import internalEscalationsRouter from "./internalEscalations";
 import internalRouter from "./internal";
 import voiceRouter from "./voice";
 import authRouter from "./auth";
@@ -27,6 +28,7 @@ router.use("/webhooks/twilio", smsRouter);
 router.use("/stats", stats);
 router.use("/metrics", metricsRouter);
 router.use("/internal/metrics", internalMetricsRouter);
+router.use("/internal/escalations", internalEscalationsRouter);
 router.use("/internal", internalRouter);
 router.use("/auth", authRouter);
 

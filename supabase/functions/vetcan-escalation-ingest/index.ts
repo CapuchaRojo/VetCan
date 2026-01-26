@@ -2,6 +2,61 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+/* -------------------- helpers -------------------- */
+
+function stableStringify(obj: any): string {
+  if (obj === null || typeof obj !== "object") return JSON.stringify(obj);
+  if (Array.isArray(obj)) {
+    return `[${obj.map(stableStringify).join(",")}]`;
+  }
+  const keys = Object.keys(obj).sort();
+  return `{${keys.map(k => JSON.stringify(k) + ":" + stableStringify(obj[k])).join(",")}}`;
+}
+
+async function sha256Hex(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function minuteBucket(iso: string): string {
+  return String(Math.floor(Date.parse(iso) / 60000));
+}
+
+function buildDedupeMaterial(input: {
+  event_type: string;
+  severity: string;
+  source: string;
+  correlation_id: string | null;
+  occurred_at: string;
+  data: any;
+}) {
+  // Strong preference: correlation_id
+  // Fallback: minute bucket + minimal identity
+  return stableStringify({
+    event_type: input.event_type,
+    severity: input.severity,
+    source: input.source,
+    correlation_id: input.correlation_id,
+    occurred_at_minute: minuteBucket(input.occurred_at),
+    identity: {
+      phone: typeof input.data?.phone === "string" ? input.data.phone : null,
+    },
+  });
+}
+
+function fireAndForget(url: string, body: any) {
+  fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).catch(() => {});
+}
+
+/* -------------------- handler -------------------- */
+
 serve(async (req) => {
   try {
     if (req.method !== "POST") {
@@ -14,14 +69,14 @@ serve(async (req) => {
       event_type,
       severity,
       source = "vetcan-api",
-      correlation_id,
+      correlation_id = null,
       data = {},
       occurred_at,
     } = payload ?? {};
 
     if (!event_type || !severity) {
       return new Response(
-        JSON.stringify({ error: "event_type and severity are required" }),
+        JSON.stringify({ ok: false, error: "event_type and severity are required" }),
         { status: 400 }
       );
     }
@@ -32,19 +87,36 @@ serve(async (req) => {
     if (!supabaseUrl || !serviceKey) {
       console.error("Missing Supabase env vars");
       return new Response(
-        JSON.stringify({ error: "Server misconfigured" }),
+        JSON.stringify({ ok: false, error: "Server misconfigured" }),
         { status: 500 }
       );
     }
 
-    // ✅ IMPORTANT: inject fetch explicitly
     const supabase = createClient(supabaseUrl, serviceKey, {
       global: { fetch },
+      auth: { persistSession: false },
     });
 
-    const now = occurred_at ? new Date(occurred_at) : new Date();
+    const occurredAtIso = occurred_at
+      ? new Date(occurred_at).toISOString()
+      : new Date().toISOString();
 
-    const { error } = await supabase
+    /* -------- A6.3.4: deterministic dedupe key -------- */
+
+    const dedupeMaterial = buildDedupeMaterial({
+      event_type,
+      severity,
+      source,
+      correlation_id,
+      occurred_at: occurredAtIso,
+      data,
+    });
+
+    const dedupe_key = await sha256Hex(dedupeMaterial);
+
+    /* -------- Idempotent insert -------- */
+
+    const insertAttempt = await supabase
       .from("operational_events")
       .insert({
         event_name: event_type,
@@ -52,43 +124,84 @@ serve(async (req) => {
         source,
         correlation_id,
         payload: data,
-        occurred_at: now.toISOString(),
-      });
+        occurred_at: occurredAtIso,
+        dedupe_key,
+      })
+      .select("id")
+      .maybeSingle();
 
-    if (error) {
-      console.error("Insert failed:", error);
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
-      });
+    let event_id = insertAttempt.data?.id ?? null;
+    let inserted = Boolean(event_id);
+
+    if (!event_id) {
+      const existing = await supabase
+        .from("operational_events")
+        .select("id")
+        .eq("dedupe_key", dedupe_key)
+        .maybeSingle();
+
+      event_id = existing.data?.id ?? null;
     }
 
-    const n8nUrl = Deno.env.get("N8N_INGEST_WEBHOOK_URL");
-    if (n8nUrl) {
-      fetch(n8nUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+    if (!event_id) {
+      console.error("Failed to persist or recover event");
+      return new Response(
+        JSON.stringify({ ok: false, error: "persist_failed" }),
+        { status: 500 }
+      );
+    }
+
+    /* -------- At-most-once n8n dispatch -------- */
+
+    const ledgerInsert = await supabase
+      .from("operational_event_dispatches")
+      .insert({
+        event_id,
+        target: "n8n",
+        status: "sent",
+      })
+      .select("id")
+      .maybeSingle();
+
+    const dispatched = Boolean(ledgerInsert.data?.id);
+
+    if (dispatched) {
+      const n8nUrl = Deno.env.get("N8N_INGEST_WEBHOOK_URL");
+      if (n8nUrl) {
+        fireAndForget(n8nUrl, {
           type: "vetcan.operational_event",
           emitted_at: new Date().toISOString(),
+          event_id,
+          dedupe_key,
           event: {
             event_type,
             severity,
             source,
             correlation_id,
-            occurred_at: now.toISOString(),
+            occurred_at: occurredAtIso,
             data,
           },
-        }),
-      }).catch(() => {});
+        });
+      }
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
-      headers: { "Content-Type": "application/json" },
-    });
+    /* -------- Deterministic response -------- */
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        event_id,
+        inserted,
+        deduped: !inserted,
+        dispatched,
+        dedupe_key,
+      }),
+      { headers: { "Content-Type": "application/json" } }
+    );
   } catch (err) {
     console.error("Unhandled edge error:", err);
     return new Response(
-      JSON.stringify({ error: "Unhandled edge error" }),
+      JSON.stringify({ ok: false, error: "Unhandled edge error" }),
       { status: 500 }
     );
   }

@@ -1,4 +1,5 @@
 // supabase/functions/vetcan-escalation-ingest/index.ts
+
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -33,8 +34,6 @@ function buildDedupeMaterial(input: {
   occurred_at: string;
   data: any;
 }) {
-  // Strong preference: correlation_id
-  // Fallback: minute bucket + minimal identity
   return stableStringify({
     event_type: input.event_type,
     severity: input.severity,
@@ -87,7 +86,7 @@ serve(async (req) => {
     if (!supabaseUrl || !serviceKey) {
       console.error("Missing Supabase env vars");
       return new Response(
-        JSON.stringify({ ok: false, error: "Server misconfigured" }),
+        JSON.stringify({ ok: false, error: "server_misconfigured" }),
         { status: 500 }
       );
     }
@@ -114,7 +113,7 @@ serve(async (req) => {
 
     const dedupe_key = await sha256Hex(dedupeMaterial);
 
-    /* -------- Idempotent insert -------- */
+    /* -------- Idempotent event insert -------- */
 
     const insertAttempt = await supabase
       .from("operational_events")
@@ -131,7 +130,7 @@ serve(async (req) => {
       .maybeSingle();
 
     let event_id = insertAttempt.data?.id ?? null;
-    let inserted = Boolean(event_id);
+    const inserted = Boolean(event_id);
 
     if (!event_id) {
       const existing = await supabase
@@ -150,6 +149,25 @@ serve(async (req) => {
         { status: 500 }
       );
     }
+
+    /* -------- Ensure initial lifecycle state (open) -------- */
+
+    await supabase
+      .from("operational_event_state_transitions")
+      .upsert(
+        {
+          event_id,
+          state: "open",
+          transitioned_at: occurredAtIso,
+          resolved_by: "automation",
+          source: "ingest",
+          idempotency_key: `open:${event_id}`,
+        },
+        {
+          onConflict: "idempotency_key",
+          ignoreDuplicates: true,
+        }
+      );
 
     /* -------- At-most-once n8n dispatch -------- */
 
@@ -201,7 +219,7 @@ serve(async (req) => {
   } catch (err) {
     console.error("Unhandled edge error:", err);
     return new Response(
-      JSON.stringify({ ok: false, error: "Unhandled edge error" }),
+      JSON.stringify({ ok: false, error: "unhandled_edge_error" }),
       { status: 500 }
     );
   }

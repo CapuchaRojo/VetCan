@@ -187,18 +187,12 @@ serve(async (req) => {
       const n8nUrl = Deno.env.get("N8N_INGEST_WEBHOOK_URL");
       if (n8nUrl) {
         fireAndForget(n8nUrl, {
-          type: "vetcan.operational_event",
-          emitted_at: new Date().toISOString(),
           event_id,
           dedupe_key,
-          event: {
-            event_type,
-            severity,
-            source,
-            correlation_id,
-            occurred_at: occurredAtIso,
-            data,
-          },
+          event_type,
+          severity,
+          occurred_at: occurredAtIso,
+          data,
         });
       }
     }

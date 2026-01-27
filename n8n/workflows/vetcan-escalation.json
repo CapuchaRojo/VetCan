@@ -1,21 +1,21 @@
 {
-  "name": "VetCan – Alert Escalation (Extended) [A5.8.2]",
+  "name": "VetCan – Alert Escalation {[post-gref A6.4]}",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "=POST",
-        "path": "38470a9a-98e3-4766-b111-96236549583c",
+        "path": "5c279a74-a689-4d7b-a946-3e1a22d84437",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
         -1488,
-        80
+        104
       ],
-      "id": "e93355cf-92cc-4fd9-8ed3-6a08b24a5e09",
+      "id": "68be9cf5-a9bf-466e-91f0-36a0b674ec68",
       "name": "Webhook",
-      "webhookId": "38470a9a-98e3-4766-b111-96236549583c"
+      "webhookId": "5c279a74-a689-4d7b-a946-3e1a22d84437"
     },
     {
       "parameters": {
@@ -165,10 +165,10 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        -560,
-        248
+        -368,
+        328
       ],
-      "id": "202c8643-f61d-4ad5-82b7-bb813f42e327",
+      "id": "60be46e6-2aa2-4c74-b012-b049be41a953",
       "name": "Switch",
       "alwaysOutputData": true
     },
@@ -268,10 +268,10 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        144,
-        288
+        1648,
+        -128
       ],
-      "id": "500dc241-6a38-4492-944b-21a9687ea17c",
+      "id": "0e62806c-b853-4c12-bee0-5cb3eea3312f",
       "name": "Append row in sheet",
       "alwaysOutputData": false,
       "credentials": {
@@ -322,10 +322,10 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -752,
-        160
+        -592,
+        392
       ],
-      "id": "1afc6dc3-dc90-44fa-b215-49d197139dce",
+      "id": "1ae027c6-afe7-44ad-81a7-e2d6be7810a5",
       "name": "Normalize",
       "alwaysOutputData": false
     },
@@ -336,10 +336,10 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        -336,
-        248
+        -144,
+        328
       ],
-      "id": "0f584c32-e8bd-4a65-ab0e-43e73b69c081",
+      "id": "f070bb98-c9ba-4695-ac37-bc35626bd3f5",
       "name": "Merge"
     },
     {
@@ -425,60 +425,14 @@
         },
         "options": {}
       },
-      "id": "af50b5fb-bc49-40ad-ae5e-e69577024528",
+      "id": "019fee4f-9873-4644-b11f-6bf5742ec5f6",
       "name": "Switch — Alert Severity",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        -480,
-        -64
+        -368,
+        -256
       ]
-    },
-    {
-      "parameters": {
-        "fromEmail": "adam.hoodtech@gmail.com",
-        "toEmail": "adam.hoodtech@gmail.com",
-        "subject": "VetCan Alert - {{json.severity.toUpperCase()}}",
-        "text": "Alert Type: {{$json.alertType}}Event: {{$json.eventName}}Environment: {{$json.environment}}Severity: {{$json.severity}}Age: {{$json.ageSeconds}} secondsCall SID: {{$json.callSid || \"N/A\"}}Metrics Dashboard:http://localhost:5173/metricsAdmin Dashboard:http://localhost:5173/",
-        "options": {}
-      },
-      "id": "5e0a80e3-5c2f-4111-a957-21a18f4bf07f",
-      "name": "Email Staff (Alert)",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2,
-      "position": [
-        -112,
-        -336
-      ],
-      "webhookId": "83c1b645-5220-492e-90d6-c628cfcc5510",
-      "credentials": {
-        "smtp": {
-          "id": "EMs6uL5uzGmcrvjy",
-          "name": "SMTP account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "from": "+18556008710",
-        "to": "+16892785991",
-        "message": "CRITICAL VetCan Alert{{$json.alertType}}Age {{$json.ageSeconds}}sCall {{$json.callSid || \"N/A\"}}http://localhost:5173/metrics",
-        "options": {}
-      },
-      "id": "c0231a17-1d15-49d2-b48c-26841f570683",
-      "name": "SMS Staff (Critical)",
-      "type": "n8n-nodes-base.twilio",
-      "typeVersion": 1,
-      "position": [
-        112,
-        24
-      ],
-      "credentials": {
-        "twilioApi": {
-          "id": "xWvTGVNFo2tV4Wf1",
-          "name": "Twilio account"
-        }
-      }
     },
     {
       "parameters": {
@@ -545,43 +499,12 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -752,
-        -64
+        -592,
+        -240
       ],
-      "id": "1a66545e-0114-4660-868b-89a9566c6207",
+      "id": "207ab4ec-aae8-4b71-8afe-b4489520b449",
       "name": "Normalize Alert Escalation",
       "alwaysOutputData": false
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://ofawihtqxxumzegskknr.functions.supabase.co/vetcan-resolution-callback",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mYXdpaHRxeHh1bXplZ3Nra25yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzMzcxMDYsImV4cCI6MjA4NDkxMzEwNn0.IRgWOqnRee_2GClBRtagg_FneEtPEhvkF-_WPz5DZbU"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"event_id\": \"={{ $json.event_id }}\",\n  \"dedupe_key\": \"={{ $json.dedupe_key }}\",\n  \"state\": \"acknowledged\",\n  \"resolved_by\": \"automation\",\n  \"idempotency_key\": \"={{ 'ack:' + $json.event_id }}\",\n  \"note\": \"n8n acknowledged escalation\",\n  \"source\": \"n8n\"\n}\n",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        -960,
-        -64
-      ],
-      "id": "4f10e730-b641-4617-92ad-2fce382960cd",
-      "name": "Acknowledge"
     },
     {
       "parameters": {
@@ -636,10 +559,10 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -1328,
-        80
+        -1264,
+        104
       ],
-      "id": "6b486814-123f-4eaf-95f0-3d60d25f51a3",
+      "id": "2f8c34c0-426f-4194-8d0e-3bb75eacf7c1",
       "name": "Canonical Normalize (Lifecycle)"
     },
     {
@@ -667,10 +590,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        336,
-        -160
+        1872,
+        -560
       ],
-      "id": "d9461f6e-6fe6-4712-9769-9c9c27d6cbfc",
+      "id": "4df4c74c-02bb-473a-aa61-e3bc02c6a1f4",
       "name": "Resolve Event"
     },
     {
@@ -685,10 +608,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        336,
-        24
+        1872,
+        248
       ],
-      "id": "c816dcfa-2c25-412b-a0b4-461e73ae4aea",
+      "id": "a06a3b9b-2de9-4805-896c-33230d73dbea",
       "name": "FAIL Callback"
     },
     {
@@ -714,40 +637,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -112,
-        -112
+        1424,
+        136
       ],
-      "id": "a60f5fa8-8b88-4430-aeee-c2e1303900f1",
+      "id": "0152487a-653f-488a-b81a-269a759ae1da",
       "name": "Preserve Lifecycle Context"
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "9ab5a24d-95cb-4956-b5a8-3bc4fb95e460",
-              "name": "event_id",
-              "value": "={{$json.event_id}}",
-              "type": "string"
-            },
-            {
-              "id": "0c00023a-2fad-4423-a16c-717caac4177d",
-              "name": "dedupe_key",
-              "value": "={{$json.dedupe_key}}",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        112,
-        -160
-      ],
-      "id": "975b3294-b925-48e2-9f33-5a6421510aec",
-      "name": "Preserve Lifecycle Context (resolve)"
     },
     {
       "parameters": {
@@ -777,11 +671,466 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -1168,
-        80
+        -1040,
+        104
       ],
-      "id": "f38c1b10-f644-47fd-8a38-ac5ade8e2149",
+      "id": "4e553b49-3b71-4c76-8164-e64d56494bb2",
       "name": "If"
+    },
+    {
+      "parameters": {
+        "language": "javascript"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        -424
+      ],
+      "id": "cec8ea7c-843b-4b2b-8b53-371f99d4e037",
+      "name": "SLA Guard — Warning"
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        80,
+        -424
+      ],
+      "id": "f28a287c-348d-4cb6-a373-f9e33c0759ed",
+      "name": "SLA Wait — Warning (30m)",
+      "webhookId": "f353a352-6cd0-47f7-a1f4-6e2f38872d5a"
+    },
+    {
+      "parameters": {
+        "url": "={{`https://ofawihtqxxumzegskknr.supabase.co/rest/v1/operational_event_state_current?event_id=eq.${$json.event_id}&select=state,last_transition_source`}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mYXdpaHRxeHh1bXplZ3Nra25yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzMzcxMDYsImV4cCI6MjA4NDkxMzEwNn0.IRgWOqnRee_2GClBRtagg_FneEtPEhvkF-_WPz5DZbU"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mYXdpaHRxeHh1bXplZ3Nra25yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzMzcxMDYsImV4cCI6MjA4NDkxMzEwNn0.IRgWOqnRee_2GClBRtagg_FneEtPEhvkF-_WPz5DZbU"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        304,
+        -424
+      ],
+      "id": "e1539b8e-794d-4254-b816-60326687870f",
+      "name": "SLA State Lookup — Warning"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "747f52e5-30d4-4cbb-b815-04d9bf40227a",
+              "name": "current_state",
+              "value": "={{$json[0]?.state || ''}}",
+              "type": "string"
+            },
+            {
+              "id": "a581de0d-4b54-4290-b206-7555656f1258",
+              "name": "current_source",
+              "value": "={{$json[0]?.last_transition_source || ''}}",
+              "type": "string"
+            },
+            {
+              "id": "0d55da2e-38e3-4566-9723-c2ae0847fca2",
+              "name": "state_missing",
+              "value": "={{!$json[0] || !$json[0].state}}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        528,
+        -424
+      ],
+      "id": "0887c8b1-0b0f-4811-85ca-e6bc3724716b",
+      "name": "SLA Normalize State — Warning"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f8c45299-717f-4cb6-8927-912aff8d6864",
+              "leftValue": "={{$json.current_state}}",
+              "rightValue": "open",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        752,
+        -424
+      ],
+      "id": "4583f68b-ea0e-4a1e-aab6-aaa27f97503e",
+      "name": "SLA Proceed? — Warning"
+    },
+    {
+      "parameters": {
+        "language": "javascript"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        -512
+      ],
+      "id": "51bcd8be-b591-4ade-ae76-36aab27b76a0",
+      "name": "SLA Mark Escalated — Warning"
+    },
+    {
+      "parameters": {
+        "language": "javascript"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        -320
+      ],
+      "id": "cbca9629-d24d-454a-9913-669746b9fd33",
+      "name": "SLA Mark Cancelled — Warning"
+    },
+    {
+      "parameters": {
+        "language": "javascript"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        40
+      ],
+      "id": "f9df75e1-0b8b-451a-b09b-3ef09c7ab24c",
+      "name": "SLA Mark Escalated — Critical"
+    },
+    {
+      "parameters": {
+        "language": "javascript"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        232
+      ],
+      "id": "0e312738-7add-4405-90af-513dc322efd7",
+      "name": "SLA Mark Cancelled — Critical"
+    },
+    {
+      "parameters": {
+        "language": "javascript"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        56
+      ],
+      "id": "a68ed3fe-9368-4d24-9e88-b47ea50b532a",
+      "name": "SLA Guard — Critical"
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        80,
+        56
+      ],
+      "id": "7555e0ef-54c2-49c2-bb21-3cb9ecc21dac",
+      "name": "SLA Wait — Critical (5m)",
+      "webhookId": "436519ae-158f-4aa5-b8e1-04386bd18a83"
+    },
+    {
+      "parameters": {
+        "url": "={{`https://ofawihtqxxumzegskknr.supabase.co/rest/v1/operational_event_state_current?event_id=eq.${$json.event_id}&select=state,last_transition_source`}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mYXdpaHRxeHh1bXplZ3Nra25yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzMzcxMDYsImV4cCI6MjA4NDkxMzEwNn0.IRgWOqnRee_2GClBRtagg_FneEtPEhvkF-_WPz5DZbU"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mYXdpaHRxeHh1bXplZ3Nra25yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzMzcxMDYsImV4cCI6MjA4NDkxMzEwNn0.IRgWOqnRee_2GClBRtagg_FneEtPEhvkF-_WPz5DZbU"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        304,
+        56
+      ],
+      "id": "636981db-2dac-4e49-92e3-ebfc7297dd52",
+      "name": "SLA State Lookup — Critical"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4e421ea1-8508-49b0-920a-f55e261b2ce1",
+              "name": "current_state",
+              "value": "={{$json[0]?.state || ''}}",
+              "type": "string"
+            },
+            {
+              "id": "6defbbc7-5771-46d1-86cd-525175d05f12",
+              "name": "current_source",
+              "value": "={{$json[0]?.last_transition_source || ''}}",
+              "type": "string"
+            },
+            {
+              "id": "a6496ec1-3151-4e9b-baf3-344d005b24aa",
+              "name": "state_missing",
+              "value": "={{!$json[0] || !$json[0].state}}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        528,
+        56
+      ],
+      "id": "cbcc3556-5abf-4bf6-9e34-904661bf007b",
+      "name": "SLA Normalize State — Critical"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2d55cf49-2e35-47e7-99de-ec198cedc475",
+              "leftValue": "={{$json.current_state}}",
+              "rightValue": "open",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        752,
+        56
+      ],
+      "id": "a49bcf8c-ce25-4a3a-a666-fd18cac5db48",
+      "name": "SLA Proceed? — Critical"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ofawihtqxxumzegskknr.functions.supabase.co/vetcan-resolution-callback",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mYXdpaHRxeHh1bXplZ3Nra25yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzMzcxMDYsImV4cCI6MjA4NDkxMzEwNn0.IRgWOqnRee_2GClBRtagg_FneEtPEhvkF-_WPz5DZbU"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"event_id\": \"={{ $json.event_id }}\",\n  \"dedupe_key\": \"={{ $json.dedupe_key }}\",\n  \"state\": \"acknowledged\",\n  \"resolved_by\": \"automation\",\n  \"idempotency_key\": \"={{ 'ack:' + $json.event_id }}\",\n  \"note\": \"n8n acknowledged escalation after SLA\",\n  \"source\": \"n8n\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1200,
+        -512
+      ],
+      "id": "d227a3be-abdb-4abe-aacc-47aafb4a29f4",
+      "name": "Acknowledge (SLA) — Warning"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ofawihtqxxumzegskknr.functions.supabase.co/vetcan-resolution-callback",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mYXdpaHRxeHh1bXplZ3Nra25yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzMzcxMDYsImV4cCI6MjA4NDkxMzEwNn0.IRgWOqnRee_2GClBRtagg_FneEtPEhvkF-_WPz5DZbU"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"event_id\": \"={{ $json.event_id }}\",\n  \"dedupe_key\": \"={{ $json.dedupe_key }}\",\n  \"state\": \"acknowledged\",\n  \"resolved_by\": \"automation\",\n  \"idempotency_key\": \"={{ 'ack:' + $json.event_id }}\",\n  \"note\": \"n8n acknowledged escalation after SLA\",\n  \"source\": \"n8n\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1200,
+        40
+      ],
+      "id": "2c0479c1-b3b6-4643-b987-dfdfcd3e4b51",
+      "name": "Acknowledge (SLA) — Critical"
+    },
+    {
+      "parameters": {
+        "from": "+18556008710",
+        "to": "+16892785991",
+        "message": "CRITICAL VetCan Alert{{$json.alertType}}Age {{$json.ageSeconds}}sCall {{$json.callSid || \"N/A\"}}http://localhost:5173/metrics",
+        "options": {}
+      },
+      "id": "876f954f-211e-41af-a181-c1a81f7baf5c",
+      "name": "SMS Staff (Critical)1",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1648,
+        248
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "xWvTGVNFo2tV4Wf1",
+          "name": "Twilio account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ofawihtqxxumzegskknr.functions.supabase.co/vetcan-resolution-callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"event_id\": \"={{$json.event_id}}\",\n  \"dedupe_key\": \"={{$json.dedupe_key}}\",\n  \"state\": \"failed\",\n  \"resolved_by\": \"automation\",\n  \"idempotency_key\": \"fail:{{$json.event_id}}\",\n  \"note\": \"critical alert escalated to human\",\n  \"source\": \"n8n\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1488,
+        680
+      ],
+      "id": "fdf6c352-1f0f-47b4-844c-8f7375fe2655",
+      "name": "FAIL Callback1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9ab5a24d-95cb-4956-b5a8-3bc4fb95e460",
+              "name": "event_id",
+              "value": "={{$json.event_id}}",
+              "type": "string"
+            },
+            {
+              "id": "0c00023a-2fad-4423-a16c-717caac4177d",
+              "name": "dedupe_key",
+              "value": "={{$json.dedupe_key}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1648,
+        -560
+      ],
+      "id": "7c06278a-a528-4d6f-895b-8442d8df3f59",
+      "name": "Preserve Lifecycle Context (resolve)"
+    },
+    {
+      "parameters": {
+        "fromEmail": "adam.hoodtech@gmail.com",
+        "toEmail": "adam.hoodtech@gmail.com",
+        "subject": "VetCan Alert - {{json.severity.toUpperCase()}}",
+        "text": "Alert Type: {{$json.alertType}}Event: {{$json.eventName}}Environment: {{$json.environment}}Severity: {{$json.severity}}Age: {{$json.ageSeconds}} secondsCall SID: {{$json.callSid || \"N/A\"}}Metrics Dashboard:http://localhost:5173/metricsAdmin Dashboard:http://localhost:5173/",
+        "options": {}
+      },
+      "id": "6c429612-2e6e-4dbd-8cfb-02cedfaff379",
+      "name": "Email Staff (Alert)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        -512
+      ],
+      "webhookId": "83c1b645-5220-492e-90d6-c628cfcc5510",
+      "credentials": {
+        "smtp": {
+          "id": "EMs6uL5uzGmcrvjy",
+          "name": "SMTP account"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -867,54 +1216,17 @@
     },
     "Switch — Alert Severity": {
       "main": [
+        [],
         [
           {
-            "node": "Append row in sheet",
+            "node": "SLA Guard — Warning",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Preserve Lifecycle Context",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Email Staff (Alert)",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Append row in sheet",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Preserve Lifecycle Context",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Email Staff (Alert)",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Append row in sheet",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "SMS Staff (Critical)": {
-      "main": [
-        [
-          {
-            "node": "FAIL Callback",
+            "node": "SLA Guard — Critical",
             "type": "main",
             "index": 0
           }
@@ -932,38 +1244,11 @@
         ]
       ]
     },
-    "Acknowledge": {
-      "main": [
-        [
-          {
-            "node": "Normalize Alert Escalation",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Normalize",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Canonical Normalize (Lifecycle)": {
       "main": [
         [
           {
             "node": "If",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Email Staff (Alert)": {
-      "main": [
-        [
-          {
-            "node": "Preserve Lifecycle Context (resolve)",
             "type": "main",
             "index": 0
           }
@@ -989,7 +1274,192 @@
       "main": [
         [
           {
-            "node": "SMS Staff (Critical)",
+            "node": "SMS Staff (Critical)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Normalize Alert Escalation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SLA Guard — Warning": {
+      "main": [
+        [
+          {
+            "node": "SLA Wait — Warning (30m)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SLA Wait — Warning (30m)": {
+      "main": [
+        [
+          {
+            "node": "SLA State Lookup — Warning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SLA Guard — Critical": {
+      "main": [
+        [
+          {
+            "node": "SLA Wait — Critical (5m)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SLA Wait — Critical (5m)": {
+      "main": [
+        [
+          {
+            "node": "SLA State Lookup — Critical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SLA State Lookup — Critical": {
+      "main": [
+        [
+          {
+            "node": "SLA Normalize State — Critical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SLA Normalize State — Critical": {
+      "main": [
+        [
+          {
+            "node": "SLA Proceed? — Critical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SLA Normalize State — Warning": {
+      "main": [
+        [
+          {
+            "node": "SLA Proceed? — Warning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SLA State Lookup — Warning": {
+      "main": [
+        [
+          {
+            "node": "SLA Normalize State — Warning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SLA Proceed? — Warning": {
+      "main": [
+        [
+          {
+            "node": "SLA Mark Escalated — Warning",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SLA Mark Cancelled — Warning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SLA Proceed? — Critical": {
+      "main": [
+        [
+          {
+            "node": "SLA Mark Escalated — Critical",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SLA Mark Cancelled — Critical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SLA Mark Escalated — Warning": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge (SLA) — Warning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acknowledge (SLA) — Warning": {
+      "main": [
+        [
+          {
+            "node": "Email Staff (Alert)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Staff (Alert)": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Preserve Lifecycle Context (resolve)",
             "type": "main",
             "index": 0
           }
@@ -1007,18 +1477,60 @@
         ]
       ]
     },
-    "If": {
+    "SLA Mark Escalated — Critical": {
       "main": [
         [
           {
-            "node": "Acknowledge",
+            "node": "Acknowledge (SLA) — Critical",
             "type": "main",
             "index": 0
           }
-        ],
+        ]
+      ]
+    },
+    "Acknowledge (SLA) — Critical": {
+      "main": [
         [
           {
-            "node": "Normalize",
+            "node": "Preserve Lifecycle Context",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SMS Staff (Critical)1": {
+      "main": [
+        [
+          {
+            "node": "FAIL Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SLA Mark Cancelled — Critical": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SLA Mark Cancelled — Warning": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
             "type": "main",
             "index": 0
           }
@@ -1026,16 +1538,16 @@
       ]
     }
   },
-  "active": true,
+  "active": false,
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": false
   },
-  "versionId": "cc05e3c0-5a5d-4d1d-a69e-54ec74fabe0e",
+  "versionId": "4aab6b36-44fa-43e1-b7d1-04f08a8825b6",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "8376bce67cef2eb0123aeec27235b52e4b013d25abccf8984db07b728f1f19d6"
   },
-  "id": "PUo15NmLMi53Z3_o-jBfv",
+  "id": "eYjT6B1uFoeT6vn1",
   "tags": []
 }

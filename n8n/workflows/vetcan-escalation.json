@@ -1,0 +1,1041 @@
+{
+  "name": "VetCan – Alert Escalation (Extended) [A5.8.2]",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "=POST",
+        "path": "38470a9a-98e3-4766-b111-96236549583c",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1488,
+        80
+      ],
+      "id": "e93355cf-92cc-4fd9-8ed3-6a08b24a5e09",
+      "name": "Webhook",
+      "webhookId": "38470a9a-98e3-4766-b111-96236549583c"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.event_name}}",
+                    "rightValue": "voice_state_transition",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "3454ebfd-4ca0-4270-b3f3-83ab1e25e3c3"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "f9086a4d-7085-41c2-beff-f8186bbb9979",
+                    "leftValue": "={{$json.event_name}}",
+                    "rightValue": "validation_failed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "dc7b8df9-af67-40c2-8567-1ec776bf6420",
+                    "leftValue": "={{$json.event_name}}",
+                    "rightValue": "callback_create_attempt",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "f950fc38-2eed-4872-b3f5-393646776a9a",
+                    "leftValue": "={{$json.event_name}}",
+                    "rightValue": "callback_create_result",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "2b86ca33-9971-454c-973c-9063f64e050d",
+                    "leftValue": "={{$json.event_name}}",
+                    "rightValue": "ai_call_initiated",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "28450c52-dc72-43bd-bec8-0a7454702a1d",
+                    "leftValue": "={{$json.event_name}}",
+                    "rightValue": "appointment_create_result",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -560,
+        248
+      ],
+      "id": "202c8643-f61d-4ad5-82b7-bb813f42e327",
+      "name": "Switch",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1vPT9PdL8Ihn8a6nAxGEPtzGY_19We0APktcCXX_kocg",
+          "mode": "list",
+          "cachedResultName": "RawEvents2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1vPT9PdL8Ihn8a6nAxGEPtzGY_19We0APktcCXX_kocg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1vPT9PdL8Ihn8a6nAxGEPtzGY_19We0APktcCXX_kocg/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{$json.occurred_at}}",
+            "event_type": "={{$json.event_name}}",
+            "from": "={{$json.from}}",
+            "to": "={{$json.to}}",
+            "correlation_id": "={{$json.correlation_id}}",
+            "environment": "={{$json.environment}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_type",
+              "displayName": "event_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "from",
+              "displayName": "from",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "to",
+              "displayName": "to",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "environment",
+              "displayName": "environment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "correlation_id",
+              "displayName": "correlation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        144,
+        288
+      ],
+      "id": "500dc241-6a38-4492-944b-21a9687ea17c",
+      "name": "Append row in sheet",
+      "alwaysOutputData": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "vgsQEcxrO8FiJAe3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "24a85635-6f5a-4113-b71b-d945c1989a28",
+              "name": "event_name",
+              "value": "={{$json.eventName}}",
+              "type": "string"
+            },
+            {
+              "id": "f839a4ca-de16-46a9-a9ab-180ddd415ada",
+              "name": "occurred_at",
+              "value": "={{$json.body.timestamp}}",
+              "type": "string"
+            },
+            {
+              "id": "b3c1c922-1725-498c-8f19-88c777b15210",
+              "name": "correlation_id",
+              "value": "={{$json.body.correlation_id || \"\"}}",
+              "type": "string"
+            },
+            {
+              "id": "745f9df9-7208-45d1-b1ff-c2577a443fa2",
+              "name": "environment",
+              "value": "={{$json.environment || \"local\"}}",
+              "type": "string"
+            },
+            {
+              "id": "fe198e73-bff5-418d-a040-04996d6f8c06",
+              "name": "to",
+              "value": "={{$json.body.payload?.to}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -752,
+        160
+      ],
+      "id": "1afc6dc3-dc90-44fa-b215-49d197139dce",
+      "name": "Normalize",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "numberInputs": 6
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -336,
+        248
+      ],
+      "id": "0f584c32-e8bd-4a65-ab0e-43e73b69c081",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "4a1d6ec7-9a0e-4b7c-af95-b018ec56f301",
+                    "leftValue": "=={{ $json.severityNormalized }}",
+                    "rightValue": "info",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "info"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "458639dc-85e5-4415-8a06-5518ba2a7108",
+                    "leftValue": "=={{ $json.severityNormalized }}",
+                    "rightValue": "warning",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "warning"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "207f34eb-63a4-4c0e-b23a-c6619132af94",
+                    "leftValue": "=={{ $json.severityNormalized }}",
+                    "rightValue": "critical",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "critical"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "af50b5fb-bc49-40ad-ae5e-e69577024528",
+      "name": "Switch — Alert Severity",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -480,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "adam.hoodtech@gmail.com",
+        "toEmail": "adam.hoodtech@gmail.com",
+        "subject": "VetCan Alert - {{json.severity.toUpperCase()}}",
+        "text": "Alert Type: {{$json.alertType}}Event: {{$json.eventName}}Environment: {{$json.environment}}Severity: {{$json.severity}}Age: {{$json.ageSeconds}} secondsCall SID: {{$json.callSid || \"N/A\"}}Metrics Dashboard:http://localhost:5173/metricsAdmin Dashboard:http://localhost:5173/",
+        "options": {}
+      },
+      "id": "5e0a80e3-5c2f-4111-a957-21a18f4bf07f",
+      "name": "Email Staff (Alert)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        -336
+      ],
+      "webhookId": "83c1b645-5220-492e-90d6-c628cfcc5510",
+      "credentials": {
+        "smtp": {
+          "id": "EMs6uL5uzGmcrvjy",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "+18556008710",
+        "to": "+16892785991",
+        "message": "CRITICAL VetCan Alert{{$json.alertType}}Age {{$json.ageSeconds}}sCall {{$json.callSid || \"N/A\"}}http://localhost:5173/metrics",
+        "options": {}
+      },
+      "id": "c0231a17-1d15-49d2-b48c-26841f570683",
+      "name": "SMS Staff (Critical)",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        112,
+        24
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "xWvTGVNFo2tV4Wf1",
+          "name": "Twilio account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "24a85635-6f5a-4113-b71b-d945c1989a28",
+              "name": "triggeredAt",
+              "value": "={{ $json.body && $json.body.triggeredAt ? $json.body.triggeredAt : $json.triggeredAt }}",
+              "type": "string"
+            },
+            {
+              "id": "f839a4ca-de16-46a9-a9ab-180ddd415ada",
+              "name": "alertType",
+              "value": "={{ $json.body && $json.body.alertType ? $json.body.alertType : $json.alertType }}",
+              "type": "string"
+            },
+            {
+              "id": "fe198e73-bff5-418d-a040-04996d6f8c06",
+              "name": "ageSeconds",
+              "value": "={{ $json.body && ($json.body.ageSeconds !== undefined && $json.body.ageSeconds !== null) ? $json.body.ageSeconds : $json.ageSeconds }}",
+              "type": "number"
+            },
+            {
+              "id": "745f9df9-7208-45d1-b1ff-c2577a443fa2",
+              "name": "environment",
+              "value": "={{ $json.body && $json.body.environment ? $json.body.environment : $json.environment }}",
+              "type": "string"
+            },
+            {
+              "id": "4f447fe3-52b6-46ed-8cc7-1651d2c5c8cb",
+              "name": "severity",
+              "value": "={{ $json.body && $json.body.severity ? $json.body.severity : $json.severity }}",
+              "type": "string"
+            },
+            {
+              "id": "1eadf887-d0e2-4e61-95f9-a90e40293eba",
+              "name": "eventName",
+              "value": "={{ $json.body && $json.body.eventName ? $json.body.eventName : $json.eventName }}",
+              "type": "string"
+            },
+            {
+              "id": "7d85f7fd-1487-4785-a17a-0f058a180ef8",
+              "name": "callSid",
+              "value": "={{ $json.body && $json.body.callSid ? $json.body.callSid : $json.callSid }}",
+              "type": "string"
+            },
+            {
+              "id": "769a820e-fce4-4bb2-a6a6-ea52c1f1fd47",
+              "name": "severityNormalized",
+              "value": "={{ ($json.body.severity || 'info').toLowerCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "32b1a20c-cab6-44d6-a061-a475783b6b3b",
+              "name": "summary",
+              "value": "={{    `[${$json.body.severity.toUpperCase()}] ` +   `${$json.body.eventName} ` +   `(${ $json.body.alertType }) ` +   `env=${ $json.body.environment } ` +   `age=${ $json.body.ageSeconds }s ` +   `sid=${ $json.body.callSid }` }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -752,
+        -64
+      ],
+      "id": "1a66545e-0114-4660-868b-89a9566c6207",
+      "name": "Normalize Alert Escalation",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ofawihtqxxumzegskknr.functions.supabase.co/vetcan-resolution-callback",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mYXdpaHRxeHh1bXplZ3Nra25yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzMzcxMDYsImV4cCI6MjA4NDkxMzEwNn0.IRgWOqnRee_2GClBRtagg_FneEtPEhvkF-_WPz5DZbU"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"event_id\": \"={{ $json.event_id }}\",\n  \"dedupe_key\": \"={{ $json.dedupe_key }}\",\n  \"state\": \"acknowledged\",\n  \"resolved_by\": \"automation\",\n  \"idempotency_key\": \"={{ 'ack:' + $json.event_id }}\",\n  \"note\": \"n8n acknowledged escalation\",\n  \"source\": \"n8n\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -960,
+        -64
+      ],
+      "id": "4f10e730-b641-4617-92ad-2fce382960cd",
+      "name": "Acknowledge"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0097c1df-6313-409e-8635-6e80af5e7000",
+              "name": "event_id",
+              "value": "={{$json.event_id || $json.body.event_id}}",
+              "type": "string"
+            },
+            {
+              "id": "f9ccad0e-7eaa-48de-baa8-8989ad143ae9",
+              "name": "dedupe_key",
+              "value": "={{$json.dedupe_key || $json.body.dedupe_key}}\n",
+              "type": "string"
+            },
+            {
+              "id": "437c2cda-258a-4ee1-a93d-b8d7dba1fcf5",
+              "name": "event_type",
+              "value": "={{$json.event_type || $json.body.event_type || $json.event_name || $json.body.event_name}}\n",
+              "type": "string"
+            },
+            {
+              "id": "97ab66ba-8f38-4533-ba3a-6ed1453e9981",
+              "name": "severity",
+              "value": "={{($json.severity || $json.body.severity || 'info').toLowerCase()}}\n",
+              "type": "string"
+            },
+            {
+              "id": "c63e3483-418e-40c1-9e2c-7a96245abbeb",
+              "name": "occurred_at",
+              "value": "={{$json.occurred_at || $json.body.occurred_at || $now.toISO()}}",
+              "type": "string"
+            },
+            {
+              "id": "26ab43b7-1460-436f-80ca-b40990bc1ff1",
+              "name": "data",
+              "value": "={{$json.data || $json.body.data}}",
+              "type": "object"
+            },
+            {
+              "id": "1f87bd75-b9f9-427d-8899-1770e6ca9187",
+              "name": "environment",
+              "value": "={{$json.data?.environment || $json.environment || 'local'}}\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1328,
+        80
+      ],
+      "id": "6b486814-123f-4eaf-95f0-3d60d25f51a3",
+      "name": "Canonical Normalize (Lifecycle)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ofawihtqxxumzegskknr.functions.supabase.co/vetcan-resolution-callback",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mYXdpaHRxeHh1bXplZ3Nra25yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzMzcxMDYsImV4cCI6MjA4NDkxMzEwNn0.IRgWOqnRee_2GClBRtagg_FneEtPEhvkF-_WPz5DZbU"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={   \"event_id\": \"{{$json.event_id}}\",   \"dedupe_key\": \"{{$json.dedupe_key}}\",   \"state\": \"resolved\",   \"resolved_by\": \"automation\",   \"idempotency_key\": \"res:{{$json.event_id}}\",   \"note\": \"n8n completed escalation workflow\",   \"source\": \"n8n\" }",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        336,
+        -160
+      ],
+      "id": "d9461f6e-6fe6-4712-9769-9c9c27d6cbfc",
+      "name": "Resolve Event"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ofawihtqxxumzegskknr.functions.supabase.co/vetcan-resolution-callback",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"event_id\": \"={{$json.event_id}}\",\n  \"dedupe_key\": \"={{$json.dedupe_key}}\",\n  \"state\": \"failed\",\n  \"resolved_by\": \"automation\",\n  \"idempotency_key\": \"fail:{{$json.event_id}}\",\n  \"note\": \"critical alert escalated to human\",\n  \"source\": \"n8n\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        336,
+        24
+      ],
+      "id": "c816dcfa-2c25-412b-a0b4-461e73ae4aea",
+      "name": "FAIL Callback"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9ab5a24d-95cb-4956-b5a8-3bc4fb95e460",
+              "name": "event_id",
+              "value": "={{$json.event_id}}",
+              "type": "string"
+            },
+            {
+              "id": "0c00023a-2fad-4423-a16c-717caac4177d",
+              "name": "dedupe_key",
+              "value": "={{$json.dedupe_key}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -112,
+        -112
+      ],
+      "id": "a60f5fa8-8b88-4430-aeee-c2e1303900f1",
+      "name": "Preserve Lifecycle Context"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9ab5a24d-95cb-4956-b5a8-3bc4fb95e460",
+              "name": "event_id",
+              "value": "={{$json.event_id}}",
+              "type": "string"
+            },
+            {
+              "id": "0c00023a-2fad-4423-a16c-717caac4177d",
+              "name": "dedupe_key",
+              "value": "={{$json.dedupe_key}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        112,
+        -160
+      ],
+      "id": "975b3294-b925-48e2-9f33-5a6421510aec",
+      "name": "Preserve Lifecycle Context (resolve)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0baacb98-6421-424b-9c99-ec036a1a01a1",
+              "leftValue": "={{$json.event_id}}",
+              "rightValue": "is not empty",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1168,
+        80
+      ],
+      "id": "f38c1b10-f644-47fd-8a38-ac5ade8e2149",
+      "name": "If"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Canonical Normalize (Lifecycle)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ],
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 3
+          }
+        ],
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 4
+          }
+        ],
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "Normalize": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch — Alert Severity": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preserve Lifecycle Context",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Email Staff (Alert)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preserve Lifecycle Context",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Email Staff (Alert)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SMS Staff (Critical)": {
+      "main": [
+        [
+          {
+            "node": "FAIL Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Alert Escalation": {
+      "main": [
+        [
+          {
+            "node": "Switch — Alert Severity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acknowledge": {
+      "main": [
+        [
+          {
+            "node": "Normalize Alert Escalation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Canonical Normalize (Lifecycle)": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Staff (Alert)": {
+      "main": [
+        [
+          {
+            "node": "Preserve Lifecycle Context (resolve)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        []
+      ]
+    },
+    "Resolve Event": {
+      "main": [
+        []
+      ]
+    },
+    "FAIL Callback": {
+      "main": [
+        []
+      ]
+    },
+    "Preserve Lifecycle Context": {
+      "main": [
+        [
+          {
+            "node": "SMS Staff (Critical)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preserve Lifecycle Context (resolve)": {
+      "main": [
+        [
+          {
+            "node": "Resolve Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "cc05e3c0-5a5d-4d1d-a69e-54ec74fabe0e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8376bce67cef2eb0123aeec27235b52e4b013d25abccf8984db07b728f1f19d6"
+  },
+  "id": "PUo15NmLMi53Z3_o-jBfv",
+  "tags": []
+}
